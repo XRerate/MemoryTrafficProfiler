@@ -17,17 +17,13 @@ namespace GPUBandwidthProfiler {
 class GPUBandwidthProfiler {
 public:
     /**
-     * @brief Get the singleton instance
+     * @brief Get the singleton instance and auto-initialize with available backend
      * @return Reference to the singleton instance
+     * @note This function automatically detects and initializes the appropriate backend
+     *       (tries Mali first, then Adreno). If no backend is available, the profiler
+     *       will not be initialized and start() will return false.
      */
     static GPUBandwidthProfiler& getInstance();
-
-    /**
-     * @brief Initialize the profiler with a specific backend
-     * @param backend Backend to use (AdrenoBackend or MaliBackend)
-     * @return true if initialization successful, false otherwise
-     */
-    bool initialize(std::unique_ptr<Backend> backend);
 
     /**
      * @brief Start bandwidth profiling
@@ -70,8 +66,21 @@ public:
     GPUBandwidthProfiler& operator=(const GPUBandwidthProfiler&) = delete;
 
 private:
-    GPUBandwidthProfiler() = default;
+    GPUBandwidthProfiler();
     ~GPUBandwidthProfiler();
+
+    /**
+     * @brief Auto-initialize with available backend
+     * Tries Mali backend first, then Adreno backend
+     */
+    void autoInitialize();
+
+    /**
+     * @brief Initialize the profiler with a specific backend (internal)
+     * @param backend Backend to use (AdrenoBackend or MaliBackend)
+     * @return true if initialization successful, false otherwise
+     */
+    bool initialize(std::unique_ptr<Backend> backend);
 
     /**
      * @brief Default callback that pretty-prints bandwidth data

@@ -68,6 +68,15 @@ target_include_directories(GPUBandwidthProfiler
         $<INSTALL_INTERFACE:include>
 )
 
+# Add compile definitions for backend availability
+if(BUILD_MALI_BACKEND)
+    target_compile_definitions(GPUBandwidthProfiler PRIVATE BUILD_MALI_BACKEND)
+endif()
+
+if(BUILD_ADRENO_BACKEND)
+    target_compile_definitions(GPUBandwidthProfiler PRIVATE BUILD_ADRENO_BACKEND)
+endif()
+
 # Link libraries
 if(BUILD_MALI_BACKEND)
     target_link_libraries(GPUBandwidthProfiler PRIVATE ${MALI_LIBRARIES})

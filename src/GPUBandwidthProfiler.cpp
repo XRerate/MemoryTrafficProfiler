@@ -1,13 +1,49 @@
 #include "GPUBandwidthProfiler.h"
+#ifdef BUILD_MALI_BACKEND
+#include "backends/mali.h"
+#endif
+#ifdef BUILD_ADRENO_BACKEND
+#include "backends/adreno.h"
+#endif
 #include <iostream>
 #include <iomanip>
 #include <chrono>
 
 namespace GPUBandwidthProfiler {
 
+GPUBandwidthProfiler::GPUBandwidthProfiler() 
+    : callback_(defaultCallback), 
+      should_sample_(false), 
+      is_profiling_(false),
+      sampling_interval_ms_(100) {
+    autoInitialize();
+}
+
 GPUBandwidthProfiler& GPUBandwidthProfiler::getInstance() {
     static GPUBandwidthProfiler instance;
     return instance;
+}
+
+void GPUBandwidthProfiler::autoInitialize() {
+    // Try to initialize with available backends
+    // Try Mali first, then Adreno
+    
+#ifdef BUILD_MALI_BACKEND
+    auto mali_backend = std::make_unique<MaliBackend>();
+    if (initialize(std::move(mali_backend))) {
+        return; // Successfully initialized with Mali
+    }
+#endif
+
+#ifdef BUILD_ADRENO_BACKEND
+    auto adreno_backend = std::make_unique<AdrenoBackend>();
+    if (initialize(std::move(adreno_backend))) {
+        return; // Successfully initialized with Adreno
+    }
+#endif
+
+    // No backend available - backend_ remains nullptr
+    // start() will return false if backend_ is nullptr
 }
 
 GPUBandwidthProfiler::~GPUBandwidthProfiler() {
@@ -15,6 +51,7 @@ GPUBandwidthProfiler::~GPUBandwidthProfiler() {
 }
 
 bool GPUBandwidthProfiler::initialize(std::unique_ptr<Backend> backend) {
+    // This is now a private method - only called internally
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (is_profiling_) {

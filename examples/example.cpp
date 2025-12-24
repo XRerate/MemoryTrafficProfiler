@@ -1,10 +1,4 @@
 #include "GPUBandwidthProfiler.h"
-#ifdef BUILD_MALI_BACKEND
-#include "backends/mali.h"
-#endif
-#ifdef BUILD_ADRENO_BACKEND
-#include "backends/adreno.h"
-#endif
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -23,28 +17,11 @@ int main(int argc, char* argv[]) {
     std::cout << "GPU Bandwidth Profiler Example" << std::endl;
     std::cout << "===============================" << std::endl << std::endl;
 
+    // getInstance() automatically initializes with available backend
     auto& profiler = GPUBandwidthProfiler::GPUBandwidthProfiler::getInstance();
 
-    bool initialized = false;
-    
-#ifdef BUILD_MALI_BACKEND
-    // Try to initialize with Mali backend first
-    std::cout << "Attempting to initialize Mali backend..." << std::endl;
-    auto mali_backend = std::make_unique<GPUBandwidthProfiler::MaliBackend>();
-    initialized = profiler.initialize(std::move(mali_backend));
-    if (!initialized) {
-        std::cerr << "Mali backend initialization failed" << std::endl;
-    }
-#endif
-
-#ifdef BUILD_ADRENO_BACKEND
-    if (!initialized) {
-        std::cout << "Attempting to initialize Adreno backend..." << std::endl;
-        initialized = profiler.initialize(std::make_unique<GPUBandwidthProfiler::AdrenoBackend>());
-    }
-#endif
-
-    if (!initialized) {
+    // Check if initialization was successful
+    if (!profiler.getBackendName()) {
         std::cerr << "Error: Failed to initialize any backend." << std::endl;
         std::cerr << "This may be because:" << std::endl;
         std::cerr << "  - No GPU device is available" << std::endl;
