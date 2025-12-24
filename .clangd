@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - -I${workspaceFolder}/include
+    - -I${workspaceFolder}/include/backends
+    - -I${workspaceFolder}/third_party/libGPUCounters/hwcpipe/include
+    - -I${workspaceFolder}/third_party/libGPUCounters/backend/device/include
+    - -std=c++14
+  Remove:
+    - -W*
+    - -w
