@@ -5,8 +5,39 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <vector>
 
 namespace GPUBandwidthProfiler {
+
+/**
+ * @brief Statistics structure for accumulated bandwidth data
+ */
+struct BandwidthStatistics {
+    size_t sample_count;              // Number of samples
+    
+    // Read bandwidth statistics
+    double read_avg_mbps;            // Average read bandwidth
+    double read_min_mbps;             // Minimum read bandwidth
+    double read_max_mbps;             // Maximum read bandwidth
+    double read_stddev_mbps;          // Standard deviation of read bandwidth
+    
+    // Write bandwidth statistics
+    double write_avg_mbps;            // Average write bandwidth
+    double write_min_mbps;             // Minimum write bandwidth
+    double write_max_mbps;             // Maximum write bandwidth
+    double write_stddev_mbps;          // Standard deviation of write bandwidth
+    
+    // Total bandwidth statistics
+    double total_avg_mbps;            // Average total bandwidth
+    double total_min_mbps;             // Minimum total bandwidth
+    double total_max_mbps;             // Maximum total bandwidth
+    double total_stddev_mbps;          // Standard deviation of total bandwidth
+    
+    // Time range
+    uint64_t first_timestamp_ns;      // First sample timestamp
+    uint64_t last_timestamp_ns;       // Last sample timestamp
+    double duration_sec;              // Duration in seconds
+};
 
 /**
  * @brief Singleton GPU bandwidth profiler
@@ -48,6 +79,39 @@ public:
      * @brief Unregister the current callback (revert to default)
      */
     void unregisterCallback();
+
+    /**
+     * @brief Register a buffer to accumulate bandwidth data
+     * @param buffer Pointer to vector that will store accumulated BandwidthData
+     * @note The buffer must remain valid while profiling is active.
+     *       Data is appended to the buffer in a thread-safe manner.
+     */
+    void registerAccumulatorBuffer(std::vector<BandwidthData>* buffer);
+
+    /**
+     * @brief Unregister the accumulator buffer
+     */
+    void unregisterAccumulatorBuffer();
+
+    /**
+     * @brief Clear the accumulator buffer
+     * @note This requires the accumulator buffer to be registered
+     */
+    void clearAccumulatorBuffer();
+
+    /**
+     * @brief Get a copy of accumulated data from the buffer
+     * @return Vector containing accumulated BandwidthData
+     * @note Returns empty vector if no accumulator buffer is registered
+     */
+    std::vector<BandwidthData> getAccumulatedData() const;
+
+    /**
+     * @brief Calculate statistics from the accumulated buffer
+     * @return BandwidthStatistics structure with calculated statistics
+     * @note Returns statistics with sample_count=0 if buffer is empty or not registered
+     */
+    BandwidthStatistics getAccumulatedStatistics() const;
 
     /**
      * @brief Check if profiling is currently active
@@ -94,11 +158,13 @@ private:
 
     std::unique_ptr<Backend> backend_;
     BandwidthCallback callback_;
+    std::vector<BandwidthData>* accumulator_buffer_;
     std::thread sampling_thread_;
     std::atomic<bool> should_sample_;
     std::atomic<bool> is_profiling_;
     uint32_t sampling_interval_ms_;
     mutable std::mutex mutex_;
+    mutable std::mutex accumulator_mutex_;
 };
 
 } // namespace GPUBandwidthProfiler
