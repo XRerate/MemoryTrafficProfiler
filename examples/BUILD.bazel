@@ -1,0 +1,17 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "gpu_bandwidth_example",
+    srcs = ["example.cpp"],
+    deps = [
+        "//:gpu_bandwidth_profiler",
+    ],
+    defines = select({
+        "//:build_mali_backend": ["BUILD_MALI_BACKEND"],
+        "//conditions:default": [],
+    }) + select({
+        "//:build_adreno_backend": ["BUILD_ADRENO_BACKEND"],
+        "//conditions:default": [],
+    }),
+)
+

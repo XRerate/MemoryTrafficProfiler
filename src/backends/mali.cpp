@@ -17,7 +17,13 @@ public:
 
     ~Impl() {
         if (sampler_ && is_profiling_) {
-            (void)sampler_->stop_sampling(); // Ignore error in destructor
+            // Best-effort cleanup in destructor: we can't throw exceptions or return errors
+            // The error code is captured but not used because:
+            // 1. Destructors should be noexcept (can't throw)
+            // 2. Object is being destroyed anyway, so error handling is not meaningful
+            // 3. This is a cleanup attempt - if it fails, there's nothing we can do
+            std::error_code ec = sampler_->stop_sampling();
+            (void)ec; // Explicitly acknowledge we're ignoring the error
         }
     }
 
@@ -78,7 +84,13 @@ public:
         // Take initial sample to establish baseline
         ec = sampler_->sample_now();
         if (ec) {
-            (void)sampler_->stop_sampling(); // Clean up on error
+            // Clean up on error: stop sampling since we started it but failed to take initial sample
+            // The error code from stop_sampling() is captured but not used because:
+            // 1. We're already returning false to indicate start() failed
+            // 2. The stop_sampling() error doesn't change the fact that start() failed
+            // 3. This is a cleanup attempt - if it fails, there's nothing more we can do
+            std::error_code stop_ec = sampler_->stop_sampling();
+            (void)stop_ec; // Explicitly acknowledge we're ignoring the cleanup error
             return false;
         }
 

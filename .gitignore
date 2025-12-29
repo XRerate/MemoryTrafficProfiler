@@ -6,6 +6,13 @@ build-android-pixel8pro/
 build-android-s25/
 cmake-build-*/
 
+# Bazel build outputs and cache
+bazel-bin
+bazel-out
+bazel-testlogs
+bazel-GPUBandwidthProfiler
+MODULE.bazel.lock
+
 # CMake generated files
 CMakeCache.txt
 CMakeFiles/

@@ -1,0 +1,39 @@
+# Bazel module file for GPUBandwidthProfiler (Bzlmod)
+module(
+    name = "gpu_bandwidth_profiler",
+    version = "1.0.0",
+    compatibility_level = 1,
+)
+
+# Load rules_cc
+bazel_dep(name = "rules_cc", version = "0.0.9")
+
+# Platforms repository (required for platform definitions)
+bazel_dep(name = "platforms", version = "0.0.10")
+
+# Android NDK Toolchain
+bazel_dep(name = "rules_android_ndk", version = "0.1.2")
+
+archive_override(
+    module_name = "rules_android_ndk",
+    urls = ["https://github.com/bazelbuild/rules_android_ndk/archive/refs/tags/v0.1.2.tar.gz"],
+    integrity = "sha256-Za7f8M1yi+45T2+45lujnExe+xGym3ZjVpItSnTGI/U=",
+    strip_prefix = "rules_android_ndk-0.1.2",
+)
+
+android_ndk_repository_extension = use_extension(
+    "@rules_android_ndk//:extension.bzl",
+    "android_ndk_repository_extension",
+)
+
+use_repo(android_ndk_repository_extension, "androidndk")
+
+register_toolchains("@androidndk//:all")
+
+# Load module extensions for QProf and libGPUCounters
+qprof_ext = use_extension("//bazel:qprof.bzl", "qprof")
+libgpu_counters_ext = use_extension("//bazel:libgpu_counters.bzl", "libgpu_counters")
+
+# Make repositories from extensions available
+use_repo(qprof_ext, "qprof")
+use_repo(libgpu_counters_ext, "libgpu_counters")

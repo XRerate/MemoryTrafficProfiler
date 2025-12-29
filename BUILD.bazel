@@ -1,0 +1,84 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+# Config settings for backend selection
+config_setting(
+    name = "build_mali_backend",
+    define_values = {"build_mali_backend": "1"},
+)
+
+config_setting(
+    name = "build_adreno_backend",
+    define_values = {"build_adreno_backend": "1"},
+)
+
+platform(
+    name = "android_arm64_platform",
+    constraint_values = [
+        "@platforms//os:android",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+# Common backend interface
+cc_library(
+    name = "backend_interface",
+    hdrs = ["include/backends/backend.h"],
+    includes = ["include"],
+)
+
+# Mali backend
+cc_library(
+    name = "mali_backend",
+    srcs = ["src/backends/mali.cpp"],
+    hdrs = ["include/backends/mali.h"],
+    deps = [
+        ":backend_interface",
+        "@libgpu_counters//hwcpipe:hwcpipe",
+    ],
+    defines = ["BUILD_MALI_BACKEND"],
+    includes = ["include"],
+    copts = ["-std=c++14"],
+)
+
+# Adreno backend
+cc_library(
+    name = "adreno_backend",
+    srcs = ["src/backends/adreno.cpp"],
+    hdrs = ["include/backends/adreno.h"],
+    deps = [
+        ":backend_interface",
+        "@qprof//:qprof",
+    ],
+    defines = ["BUILD_ADRENO_BACKEND"],
+    includes = ["include"],
+    copts = ["-std=c++14"],
+)
+
+# Main GPUBandwidthProfiler library
+cc_library(
+    name = "gpu_bandwidth_profiler",
+    srcs = ["src/GPUBandwidthProfiler.cpp"],
+    hdrs = ["include/GPUBandwidthProfiler.h"],
+    deps = [
+        ":backend_interface",
+    ] + select({
+        ":build_mali_backend": [":mali_backend"],
+        "//conditions:default": [],
+    }) + select({
+        ":build_adreno_backend": [":adreno_backend"],
+        "//conditions:default": [],
+    }),
+    defines = select({
+        ":build_mali_backend": ["BUILD_MALI_BACKEND"],
+        "//conditions:default": [],
+    }) + select({
+        ":build_adreno_backend": ["BUILD_ADRENO_BACKEND"],
+        "//conditions:default": [],
+    }),
+    includes = ["include"],
+    linkopts = ["-pthread"],
+    copts = ["-std=c++14"],
+)
+

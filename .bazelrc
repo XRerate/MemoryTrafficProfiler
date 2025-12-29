@@ -1,0 +1,27 @@
+# Bazel configuration file (Bzlmod only)
+
+# Default build configuration
+common --cxxopt=-std=c++14
+common --host_cxxopt=-std=c++14
+common --cxxopt=-Wno-unknown-warning-option
+
+# Build options
+common:build_mali_backend --define=build_mali_backend=1
+common:build_adreno_backend --define=build_adreno_backend=1
+
+# Android configuration using Android NDK toolchain
+# The Android NDK is configured via MODULE.bazel using rules_android_ndk
+common:android --extra_toolchains=@androidndk//:all
+common:android --cxxopt=-std=c++14
+
+# Android-specific configurations
+common:android_arm64 --config=android
+common:android_arm64 --platforms=//:android_arm64_platform
+
+# Mali backend with Android
+common:android_mali --config=android_arm64
+common:android_mali --config=build_mali_backend
+
+# Adreno backend with Android
+common:android_adreno --config=android_arm64
+common:android_adreno --config=build_adreno_backend

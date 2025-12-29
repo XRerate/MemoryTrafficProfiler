@@ -1,0 +1,2 @@
+# Empty BUILD file to make bazel/ a package
+
