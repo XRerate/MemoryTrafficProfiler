@@ -27,7 +27,7 @@ if(BUILD_MALI_BACKEND)
     FetchContent_Declare(
         libGPUCounters
         GIT_REPOSITORY https://github.com/ARM-software/libGPUCounters.git
-        GIT_TAG main
+        GIT_TAG aa7751b8854a8093b2efdacabec480ca4d3f29b3
     )
     FetchContent_MakeAvailable(libGPUCounters)
     set(MALI_LIBRARIES device hwcpipe)

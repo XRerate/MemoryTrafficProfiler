@@ -56,9 +56,9 @@ def _libgpu_counters_repo_impl(repository_ctx):
     # For now, let's have the repo rule re-fetch the source
     # It's not ideal but it will work
     repository_ctx.download_and_extract(
-        url = "https://github.com/ARM-software/libGPUCounters/archive/refs/heads/main.tar.gz",
-        sha256 = "0ace698637005b48b7fab93b6e8fd41593729a2b6b455313c36bea7f0b28affc",
-        stripPrefix = "libGPUCounters-main",
+        url = "https://github.com/ARM-software/libGPUCounters/archive/aa7751b8854a8093b2efdacabec480ca4d3f29b3.tar.gz",
+        sha256 = "944b4949bc3f7a22437f0ffd456a3063baf0e2dff82d63a10902cde310684d88",
+        stripPrefix = "libGPUCounters-aa7751b8854a8093b2efdacabec480ca4d3f29b3",
     )
     
     # Create REPO.bazel so Bazel recognizes this as a repository (Bzlmod)
