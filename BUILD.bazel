@@ -35,7 +35,7 @@ cc_library(
     hdrs = ["include/backends/mali.h"],
     deps = [
         ":backend_interface",
-        "@libgpu_counters//hwcpipe:hwcpipe",
+            "@libgpu_counters_build//hwcpipe:hwcpipe",
     ],
     defines = ["BUILD_MALI_BACKEND"],
     includes = ["include"],

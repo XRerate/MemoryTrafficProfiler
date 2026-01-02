@@ -5,15 +5,12 @@ module(
     compatibility_level = 1,
 )
 
-# Load rules_cc
+# From Bazel Central Registry
 bazel_dep(name = "rules_cc", version = "0.0.9")
-
-# Platforms repository (required for platform definitions)
 bazel_dep(name = "platforms", version = "0.0.10")
 
-# Android NDK Toolchain
+# ANdroid NDK Toolchain
 bazel_dep(name = "rules_android_ndk", version = "0.1.2")
-
 archive_override(
     module_name = "rules_android_ndk",
     urls = ["https://github.com/bazelbuild/rules_android_ndk/archive/refs/tags/v0.1.2.tar.gz"],
@@ -25,15 +22,17 @@ android_ndk_repository_extension = use_extension(
     "@rules_android_ndk//:extension.bzl",
     "android_ndk_repository_extension",
 )
-
 use_repo(android_ndk_repository_extension, "androidndk")
-
 register_toolchains("@androidndk//:all")
 
-# Load module extensions for QProf and libGPUCounters
-qprof_ext = use_extension("//bazel:qprof.bzl", "qprof")
-libgpu_counters_ext = use_extension("//bazel:libgpu_counters.bzl", "libgpu_counters")
+# Dependencies from local registry
+bazel_dep(name = "libgpu_counters", version = "1.0.0")
 
-# Make repositories from extensions available
+# Use our own extension to create BUILD files for libgpu_counters
+# The extension is defined in our project, not in the libgpu_counters module
+libgpu_counters_ext = use_extension("//bazel:libgpu_counters.bzl", "libgpu_counters")
+use_repo(libgpu_counters_ext, "libgpu_counters_build")
+
+# QProf is a local installation, so we still use module extension
+qprof_ext = use_extension("//bazel:qprof.bzl", "qprof")
 use_repo(qprof_ext, "qprof")
-use_repo(libgpu_counters_ext, "libgpu_counters")

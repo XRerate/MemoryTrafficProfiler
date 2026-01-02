@@ -1,0 +1,7 @@
+{
+  "type": "archive",
+  "url": "https://github.com/ARM-software/libGPUCounters/archive/refs/heads/main.tar.gz",
+  "integrity": "sha256-Cs5phjcAW0i3+rk7bo/UFZNymitrRVMTw2vqfwsor/w=",
+  "strip_prefix": "libGPUCounters-main"
+}
+

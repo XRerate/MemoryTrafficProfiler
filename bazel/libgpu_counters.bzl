@@ -3,8 +3,58 @@
 # Repository rule for libGPUCounters
 def _libgpu_counters_repo_impl(repository_ctx):
     """Repository implementation for libGPUCounters."""
-    # Fetch libGPUCounters from GitHub
-    # Using download_and_extract is the standard way in repository rules
+    # The module source is fetched by the registry to @@libgpu_counters+
+    # We need to access it. Since we can't use Label (requires BUILD files),
+    # we'll use the repository_ctx's path resolution differently.
+    # Actually, we can use repository_ctx.path() with a string path
+    # The module should be at a known location in the external directory
+    # Try to find it by looking for the MODULE.bazel file
+    # Or use the workspace root and construct the path
+    
+    # Get workspace root
+    workspace_file = repository_ctx.path(Label("//:WORKSPACE")).dirname if hasattr(repository_ctx, "path") else None
+    if not workspace_file:
+        # Try alternative: the module is in external/libgpu_counters+
+        # We can construct this path
+        # Actually, let's use os.environ or a different method
+        # The simplest: use the module extension to write the path to a file
+        # that the repository rule can read
+        pass
+    
+    # For now, let's try accessing the external directory directly
+    # The path format in Bazel's external directory is predictable
+    # But we need the actual external root. Let's use a workaround:
+    # Create BUILD files that reference the module source via external paths
+    # Or better: have the module extension create a file with the path
+    
+    # Actually, the simplest solution: in the module extension, use mod.source_path
+    # to get the path and create the repository with that knowledge
+    # But repository rules can't easily receive this. 
+    # Let's try: use repository_ctx.os.environ or a file written by the extension
+    
+    # Workaround: The module source path is available in module_ctx
+    # We'll pass it via an environment variable or file
+    # For now, let's try constructing it: external/<canonical_repo_name>
+    # The canonical name for libgpu_counters from registry would be libgpu_counters+
+    
+    # Try to access via a known pattern - the module is fetched to external
+    # We can use repository_ctx.path() with a relative path if we know the structure
+    # Actually, let's just try to symlink to where we know it should be
+    # The module from registry goes to external/libgpu_counters+ (or similar)
+    
+    # Get the external root by going up from current repo
+    current_repo = repository_ctx.name
+    # The module repo should be @@libgpu_counters+ 
+    # We can't directly reference it, but we can try to find it
+    # Let's use a different approach: download it again in the repo rule
+    # But that's wasteful. Better: use the fact that module_ctx has the path
+    
+    # Final approach: The module extension has mod.source_path
+    # We can use that to create a file that the repo rule reads
+    # Or, we can make the repo rule re-download (not ideal but works)
+    
+    # For now, let's have the repo rule re-fetch the source
+    # It's not ideal but it will work
     repository_ctx.download_and_extract(
         url = "https://github.com/ARM-software/libGPUCounters/archive/refs/heads/main.tar.gz",
         sha256 = "0ace698637005b48b7fab93b6e8fd41593729a2b6b455313c36bea7f0b28affc",
@@ -106,8 +156,18 @@ cc_library(
 )
 """)
 
+def _libgpu_counters_repo_impl_v2(repository_ctx):
+    """Repository implementation for libGPUCounters - uses module_ctx."""
+    # This will be called from the module extension with access to module_ctx
+    # For now, use a workaround: the module source is in the external cache
+    # We can construct the path: external/libgpu_counters+
+    # But we need the actual path. Let's try a different approach:
+    # Use the module extension's path() method
+    pass
+
 libgpu_counters_repo = repository_rule(
     implementation = _libgpu_counters_repo_impl,
+    attrs = {},
 )
 
 # Module extension implementation
@@ -115,7 +175,7 @@ def _libgpu_counters_impl(module_ctx):
     """Implementation of libGPUCounters module extension."""
     # Create the repository for each module using this extension
     # In Bzlmod, we call the repository rule directly
-    libgpu_counters_repo(name = "libgpu_counters")
+    libgpu_counters_repo(name = "libgpu_counters_build")
 
 libgpu_counters = module_extension(
     implementation = _libgpu_counters_impl,

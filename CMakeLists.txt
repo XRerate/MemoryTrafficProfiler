@@ -21,9 +21,15 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# Add libGPUCounters subdirectory
+# Add libGPUCounters using FetchContent (downloads from GitHub)
 if(BUILD_MALI_BACKEND)
-    add_subdirectory(third_party/libGPUCounters)
+    include(FetchContent)
+    FetchContent_Declare(
+        libGPUCounters
+        GIT_REPOSITORY https://github.com/ARM-software/libGPUCounters.git
+        GIT_TAG main
+    )
+    FetchContent_MakeAvailable(libGPUCounters)
     set(MALI_LIBRARIES device hwcpipe)
 endif()
 

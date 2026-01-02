@@ -1,0 +1,4 @@
+module(
+    name = "libgpu_counters",
+    version = "1.0.0",
+)

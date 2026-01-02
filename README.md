@@ -80,21 +80,18 @@ export QPROF_HOME=/opt/qcom/Shared/QualcommProfiler/API
 
 ### ARM Mali Backend Requirements
 
-The Mali backend uses `libGPUCounters` which is included as a git submodule. No additional environment variables are required.
+The Mali backend uses `libGPUCounters` which is automatically downloaded from GitHub during the build process. No additional environment variables or manual setup is required.
 
 ## Building
 
 ### Clone the Repository
 
 ```bash
-git clone --recursive https://github.com/XRerate/GPUBandwidthProfiler.git
+git clone https://github.com/XRerate/GPUBandwidthProfiler.git
 cd GPUBandwidthProfiler
 ```
 
-If you've already cloned without `--recursive`, initialize submodules:
-```bash
-git submodule update --init --recursive
-```
+**Note:** Dependencies (libGPUCounters) are automatically downloaded during the build process, so no submodule initialization is needed.
 
 ### Build Options
 
@@ -271,16 +268,18 @@ If CMake reports that QProf is not found:
 - Check that the device has `/dev/mali0` or similar GPU device node
 - Verify the device has the required permissions to access GPU counters
 
-### Submodule Issues
+### Dependency Issues
 
 If you encounter issues with `libGPUCounters`:
 
-```bash
-# Remove and reinitialize submodule
-git submodule deinit -f third_party/libGPUCounters
-rm -rf .git/modules/third_party/libGPUCounters
-git submodule update --init --recursive
-```
+**For CMake builds:**
+- libGPUCounters is automatically downloaded via FetchContent
+- If download fails, check your internet connection
+- You can clear the cache: `rm -rf build-*/_deps/libgpucounters-*`
+
+**For Bazel builds:**
+- libGPUCounters is fetched from the local registry
+- Ensure the registry is properly configured in `.bazelrc`
 
 ## Project Structure
 
@@ -300,7 +299,7 @@ GPUBandwidthProfiler/
 ├── examples/
 │   └── example.cpp                 # Example usage
 ├── third_party/
-│   └── libGPUCounters/             # Git submodule for Mali backend
+│   └── modules/                    # Bazel registry modules (libgpu_counters, etc.)
 ├── cmake/
 │   └── FindQProf.cmake            # CMake module for finding QProf
 ├── build-pixel8pro.sh              # Build script for Pixel 8 Pro

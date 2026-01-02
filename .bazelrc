@@ -1,5 +1,11 @@
 # Bazel configuration file (Bzlmod only)
 
+# Local registry for third-party modules
+# Note: When specifying --registry, you need to also include the central registry
+# The central registry is checked after local registries
+common --registry=https://bcr.bazel.build
+common --registry=file://%workspace%/third_party
+
 # Default build configuration
 common --cxxopt=-std=c++14
 common --host_cxxopt=-std=c++14
