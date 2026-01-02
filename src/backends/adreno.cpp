@@ -9,6 +9,34 @@
 
 namespace GPUBandwidthProfiler {
 
+// QProf metric IDs
+namespace QProfMetrics {
+    // GPU DDR bandwidth metric ID (total bandwidth in MB/s)
+    constexpr uint16_t GPU_DDR_BANDWIDTH_METRIC_ID = 4663;
+}
+
+// QProf configuration constants
+namespace QProfConfig {
+    // Streaming rate: Stream results every 200ms
+    constexpr uint32_t STREAMING_RATE_MS = 200;
+    // Sampling rate: Sample every 10ms
+    constexpr uint32_t SAMPLING_RATE_MS = 10;
+}
+
+// Precision constants for bandwidth calculations
+namespace BandwidthPrecision {
+    // Multiplier to preserve 6 decimal places (MB/s * 1000000)
+    constexpr double PRECISION_MULTIPLIER = 1000000.0;
+    // Divisor to convert back from precision format
+    constexpr double PRECISION_DIVISOR = 1000000.0;
+}
+
+// Bandwidth distribution constants
+namespace BandwidthDistribution {
+    // Split total bandwidth equally between read and write
+    constexpr double READ_WRITE_SPLIT_RATIO = 2.0;
+}
+
 // Global callback data (simplified - in production, use thread-local or instance-specific)
 static struct {
     std::mutex mutex;
@@ -31,17 +59,16 @@ void ResultCallback(LpProfilingResult profilingResult) {
         if (profilingResult->profilingResultGeneric != nullptr &&
             profilingResult->profilingResultGeneric->metricResponse != nullptr) {
             
-            // Metric ID 4663 is GPU DDR bandwidth (from working example)
-            // The value appears to be bandwidth in bytes/second (based on working example using doubleValue)
+            // Process metric responses
             for (uint16_t index = 0; index < profilingResult->profilingResultGeneric->metricResponseLen; index++) {
                 uint16_t metric_id = profilingResult->profilingResultGeneric->metricResponse[index].metricId;
                 eDataType data_type = profilingResult->profilingResultGeneric->metricResponse[index].value.dataType;
                 uint64_t timestamp = profilingResult->profilingResultGeneric->metricResponse[index].timestamp;
                 
-                // Metric 4663 is GPU DDR bandwidth (total bandwidth)
+                // Check for GPU DDR bandwidth metric
                 // Note: This appears to be total bandwidth, not separate read/write
                 // If separate read/write metrics exist (e.g., 4661, 4662), they should be added
-                if (metric_id == 4663) {
+                if (metric_id == QProfMetrics::GPU_DDR_BANDWIDTH_METRIC_ID) {
                     double bandwidth_value = 0.0;
                     switch (data_type) {
                         case DATA_TYPE_UINT64:
@@ -54,8 +81,8 @@ void ResultCallback(LpProfilingResult profilingResult) {
                             break;
                     }
                     // Store the total bandwidth value directly (QProf returns in MB/s)
-                    // Store as integer * 1000000 to preserve precision (6 decimal places)
-                    g_callback_data.read_bytes = static_cast<uint64_t>(bandwidth_value * 1000000.0);
+                    // Store as integer * PRECISION_MULTIPLIER to preserve precision (6 decimal places)
+                    g_callback_data.read_bytes = static_cast<uint64_t>(bandwidth_value * BandwidthPrecision::PRECISION_MULTIPLIER);
                     g_callback_data.write_bytes = 0; // Total is stored in read_bytes, write will be calculated
                     g_callback_data.last_timestamp_ns = timestamp;
                     g_callback_data.has_data = true;
@@ -134,9 +161,9 @@ public:
             (char*)start_config_->capabilityName.capabilityName,
             CAPABILITY_NAME_LENGTH, "profiler:apps-proc-ddr-metrics");
         start_config_->metricIds.metricIdsLen = 1;
-        start_config_->metricIds.metricIds[0] = 4663;  // GPU DDR bandwidth metric ID
-        start_config_->streamingRate = 200;  // Stream results every 200ms
-        start_config_->samplingRate = 10;    // Sample every 10ms
+        start_config_->metricIds.metricIds[0] = QProfMetrics::GPU_DDR_BANDWIDTH_METRIC_ID;
+        start_config_->streamingRate = QProfConfig::STREAMING_RATE_MS;
+        start_config_->samplingRate = QProfConfig::SAMPLING_RATE_MS;
         start_config_->resultType = RESULT_TYPE_GENERIC_STRUCT;
         start_config_->profilerConfig = nullptr;
 
@@ -200,27 +227,27 @@ public:
         }
 
         // Get latest values from callback
-        // Note: The QProf metric 4663 returns total bandwidth in MB/s (MBps) directly
+        // Note: The QProf GPU DDR bandwidth metric returns total bandwidth in MB/s (MBps) directly
         double current_total_bandwidth_mbps = 0.0;
         
         {
             std::lock_guard<std::mutex> lock(g_callback_data.mutex);
             if (g_callback_data.has_data) {
-                // The callback stores total bandwidth in MB/s (stored as integer * 1000000 for precision)
-                current_total_bandwidth_mbps = static_cast<double>(g_callback_data.read_bytes) / 1000000.0;
+                // The callback stores total bandwidth in MB/s (stored as integer * PRECISION_MULTIPLIER for precision)
+                current_total_bandwidth_mbps = static_cast<double>(g_callback_data.read_bytes) / BandwidthPrecision::PRECISION_DIVISOR;
             }
         }
 
         // QProf already returns values in MB/s, use directly
         // Split total bandwidth equally between read and write (since we don't have separate metrics)
-        data.read_bandwidth_mbps = current_total_bandwidth_mbps / 2.0;
-        data.write_bandwidth_mbps = current_total_bandwidth_mbps / 2.0;
+        data.read_bandwidth_mbps = current_total_bandwidth_mbps / BandwidthDistribution::READ_WRITE_SPLIT_RATIO;
+        data.write_bandwidth_mbps = current_total_bandwidth_mbps / BandwidthDistribution::READ_WRITE_SPLIT_RATIO;
         data.total_bandwidth_mbps = current_total_bandwidth_mbps;
         data.timestamp_ns = current_time_ns;
         
-        // Update last values for reference (store in MB/s * 1000000 for precision)
-        last_read_bytes_ = static_cast<uint64_t>(current_total_bandwidth_mbps * 1000000.0 / 2.0);
-        last_write_bytes_ = static_cast<uint64_t>(current_total_bandwidth_mbps * 1000000.0 / 2.0);
+        // Update last values for reference (store in MB/s * PRECISION_MULTIPLIER for precision)
+        last_read_bytes_ = static_cast<uint64_t>(current_total_bandwidth_mbps * BandwidthPrecision::PRECISION_MULTIPLIER / BandwidthDistribution::READ_WRITE_SPLIT_RATIO);
+        last_write_bytes_ = static_cast<uint64_t>(current_total_bandwidth_mbps * BandwidthPrecision::PRECISION_MULTIPLIER / BandwidthDistribution::READ_WRITE_SPLIT_RATIO);
         last_timestamp_ns_ = current_time_ns;
 
         return true;

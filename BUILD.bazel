@@ -24,7 +24,10 @@ platform(
 # Common backend interface
 cc_library(
     name = "backend_interface",
-    hdrs = ["include/backends/backend.h"],
+    hdrs = [
+        "include/backends/backend.h",
+        "include/backends/constants.h",
+    ],
     includes = ["include"],
 )
 

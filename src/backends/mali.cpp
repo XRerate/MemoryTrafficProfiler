@@ -1,5 +1,6 @@
 #include "backends/mali.h"
 #include "backends/backend.h"
+#include "backends/constants.h"
 #include <hwcpipe/gpu.hpp>
 #include <hwcpipe/sampler.hpp>
 #include <hwcpipe/hwcpipe_counter.h>
@@ -38,18 +39,20 @@ public:
         hwcpipe::sampler_config config(gpu_);
 
         // Add external memory bandwidth counters
-        // Use MaliExtBusRdBy and MaliExtBusWrBy (cumulative byte counters)
-        // Bandwidth will be calculated as delta_bytes / delta_time
+        // According to libGPUCounters documentation:
+        // - MaliExtBusRdBy = MaliExtBusRdBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE (read bytes, absolute)
+        // - MaliExtBusWrBy = MaliExtBusWrBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE (write bytes, absolute)
+        // These derived counters already represent bytes, so we calculate bandwidth as delta_bytes / delta_time
         std::error_code ec;
         
-        // Add read bytes counter
+        // Add read bytes counter (derived: beats * byte_size)
         ec = config.add_counter(MaliExtBusRdBy);
         if (ec) {
             fprintf(stderr, "DEBUG: Failed to add MaliExtBusRdBy counter: %s\n", ec.message().c_str());
             return false;
         }
 
-        // Add write bytes counter
+        // Add write bytes counter (derived: beats * byte_size)
         ec = config.add_counter(MaliExtBusWrBy);
         if (ec) {
             fprintf(stderr, "DEBUG: Write counter MaliExtBusWrBy not available, continuing without it\n");
@@ -180,7 +183,12 @@ public:
         }
 
         // Calculate bandwidth (bytes per second) from delta
-        double delta_time_sec = static_cast<double>(delta_time_ns) / 1e9;
+        // According to libGPUCounters documentation:
+        // Read bandwidth = (MaliExtBusRdBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE) / MALI_CONFIG_TIME_SPAN
+        // Write bandwidth = (MaliExtBusWrBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE) / MALI_CONFIG_TIME_SPAN
+        // Since MaliExtBusRdBy and MaliExtBusWrBy already include the byte_size multiplication,
+        // we just need to divide the delta by the time span
+        double delta_time_sec = static_cast<double>(delta_time_ns) / TimeConversion::NANOSECONDS_TO_SECONDS;
         
         // Handle potential counter wraparound
         int64_t read_delta = static_cast<int64_t>(current_read_bytes) - static_cast<int64_t>(last_read_bytes_);
@@ -190,9 +198,10 @@ public:
         if (read_delta < 0) read_delta = 0;
         if (write_delta < 0) write_delta = 0;
 
-        // Convert bytes/sec to MB/s
-        data.read_bandwidth_mbps = (static_cast<double>(read_delta) / delta_time_sec) / (1024.0 * 1024.0);
-        data.write_bandwidth_mbps = (static_cast<double>(write_delta) / delta_time_sec) / (1024.0 * 1024.0);
+        // Calculate bandwidth in bytes/sec, then convert to MB/s
+        // Bandwidth = delta_bytes / delta_time_sec
+        data.read_bandwidth_mbps = (static_cast<double>(read_delta) / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
+        data.write_bandwidth_mbps = (static_cast<double>(write_delta) / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
         data.total_bandwidth_mbps = data.read_bandwidth_mbps + data.write_bandwidth_mbps;
         data.timestamp_ns = current_time_ns;
 
