@@ -13,7 +13,6 @@ namespace GPUBandwidthProfiler {
 class MaliBackend::Impl {
 public:
     Impl() : gpu_(0), is_profiling_(false),
-             last_read_bytes_(0), last_write_bytes_(0),
              last_timestamp_ns_(0) {}
 
     ~Impl() {
@@ -42,7 +41,8 @@ public:
         // According to libGPUCounters documentation:
         // - MaliExtBusRdBy = MaliExtBusRdBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE (read bytes, absolute)
         // - MaliExtBusWrBy = MaliExtBusWrBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE (write bytes, absolute)
-        // These derived counters already represent bytes, so we calculate bandwidth as delta_bytes / delta_time
+        // These counters return instantaneous bandwidth in bytes/second, not cumulative bytes
+        // We use them directly and convert to MB/s
         std::error_code ec;
         
         // Add read bytes counter (derived: beats * byte_size)
@@ -97,26 +97,7 @@ public:
             return false;
         }
 
-        // Get initial counter values
-        hwcpipe::counter_sample sample;
-        ec = sampler_->get_counter_value(MaliExtBusRdBy, sample);
-        if (!ec) {
-            if (sample.type == hwcpipe::counter_sample::type::uint64) {
-                last_read_bytes_ = sample.value.uint64;
-            } else if (sample.type == hwcpipe::counter_sample::type::float64) {
-                last_read_bytes_ = static_cast<uint64_t>(sample.value.float64);
-            }
-        }
-
-        ec = sampler_->get_counter_value(MaliExtBusWrBy, sample);
-        if (!ec) {
-            if (sample.type == hwcpipe::counter_sample::type::uint64) {
-                last_write_bytes_ = sample.value.uint64;
-            } else if (sample.type == hwcpipe::counter_sample::type::float64) {
-                last_write_bytes_ = static_cast<uint64_t>(sample.value.float64);
-            }
-        }
-
+        // No need to establish baseline - counters are instantaneous, not cumulative
         last_timestamp_ns_ = get_timestamp_ns();
         is_profiling_ = true;
 
@@ -150,13 +131,8 @@ public:
 
         // Get current timestamp
         uint64_t current_time_ns = get_timestamp_ns();
-        uint64_t delta_time_ns = current_time_ns - last_timestamp_ns_;
 
-        if (delta_time_ns == 0) {
-            return false; // No time elapsed
-        }
-
-        // Get current counter values
+        // Get current counter values (these are instantaneous bandwidth in bytes/second)
         hwcpipe::counter_sample read_sample;
         ec = sampler_->get_counter_value(MaliExtBusRdBy, read_sample);
         if (ec) {
@@ -167,48 +143,27 @@ public:
         ec = sampler_->get_counter_value(MaliExtBusWrBy, write_sample);
         // Write counter is optional, continue even if it fails
 
-        uint64_t current_read_bytes = 0;
-        uint64_t current_write_bytes = 0;
+        double current_read_bytes_per_sec = 0.0;
+        double current_write_bytes_per_sec = 0.0;
 
         if (read_sample.type == hwcpipe::counter_sample::type::uint64) {
-            current_read_bytes = read_sample.value.uint64;
+            current_read_bytes_per_sec = static_cast<double>(read_sample.value.uint64);
         } else if (read_sample.type == hwcpipe::counter_sample::type::float64) {
-            current_read_bytes = static_cast<uint64_t>(read_sample.value.float64);
+            current_read_bytes_per_sec = read_sample.value.float64;
         }
 
         if (write_sample.type == hwcpipe::counter_sample::type::uint64) {
-            current_write_bytes = write_sample.value.uint64;
+            current_write_bytes_per_sec = static_cast<double>(write_sample.value.uint64);
         } else if (write_sample.type == hwcpipe::counter_sample::type::float64) {
-            current_write_bytes = static_cast<uint64_t>(write_sample.value.float64);
+            current_write_bytes_per_sec = write_sample.value.float64;
         }
 
-        // Calculate bandwidth (bytes per second) from delta
-        // According to libGPUCounters documentation:
-        // Read bandwidth = (MaliExtBusRdBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE) / MALI_CONFIG_TIME_SPAN
-        // Write bandwidth = (MaliExtBusWrBt * MALI_CONFIG_EXT_BUS_BYTE_SIZE) / MALI_CONFIG_TIME_SPAN
-        // Since MaliExtBusRdBy and MaliExtBusWrBy already include the byte_size multiplication,
-        // we just need to divide the delta by the time span
-        double delta_time_sec = static_cast<double>(delta_time_ns) / TimeConversion::NANOSECONDS_TO_SECONDS;
-        
-        // Handle potential counter wraparound
-        int64_t read_delta = static_cast<int64_t>(current_read_bytes) - static_cast<int64_t>(last_read_bytes_);
-        int64_t write_delta = static_cast<int64_t>(current_write_bytes) - static_cast<int64_t>(last_write_bytes_);
-        
-        // If delta is negative, it might be wraparound or counter reset - treat as 0
-        if (read_delta < 0) read_delta = 0;
-        if (write_delta < 0) write_delta = 0;
-
-        // Calculate bandwidth in bytes/sec, then convert to MB/s
-        // Bandwidth = delta_bytes / delta_time_sec
-        data.read_bandwidth_mbps = (static_cast<double>(read_delta) / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
-        data.write_bandwidth_mbps = (static_cast<double>(write_delta) / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
+        // Convert from bytes/second to MB/s
+        // The counters already return instantaneous bandwidth in bytes/second
+        data.read_bandwidth_mbps = current_read_bytes_per_sec / BandwidthConversion::BYTES_TO_MB;
+        data.write_bandwidth_mbps = current_write_bytes_per_sec / BandwidthConversion::BYTES_TO_MB;
         data.total_bandwidth_mbps = data.read_bandwidth_mbps + data.write_bandwidth_mbps;
         data.timestamp_ns = current_time_ns;
-
-        // Update last values for next sample
-        last_read_bytes_ = current_read_bytes;
-        last_write_bytes_ = current_write_bytes;
-        last_timestamp_ns_ = current_time_ns;
 
         return true;
     }
@@ -227,8 +182,6 @@ private:
     hwcpipe::gpu gpu_;
     std::unique_ptr<hwcpipe::sampler<>> sampler_;
     bool is_profiling_;
-    uint64_t last_read_bytes_;
-    uint64_t last_write_bytes_;
     uint64_t last_timestamp_ns_;
 };
 
