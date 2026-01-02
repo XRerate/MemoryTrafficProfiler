@@ -131,8 +131,13 @@ public:
 
         // Get current timestamp
         uint64_t current_time_ns = get_timestamp_ns();
+        auto delta_time_ns = current_time_ns - last_timestamp_ns_;
+        if (delta_time_ns == 0) {
+            return false;
+        }
+        double delta_time_sec = static_cast<double>(delta_time_ns) / TimeConversion::NANOSECONDS_TO_SECONDS;
+        last_timestamp_ns_ = current_time_ns;
 
-        // Get current counter values (these are instantaneous bandwidth in bytes/second)
         hwcpipe::counter_sample read_sample;
         ec = sampler_->get_counter_value(MaliExtBusRdBy, read_sample);
         if (ec) {
@@ -141,7 +146,6 @@ public:
 
         hwcpipe::counter_sample write_sample;
         ec = sampler_->get_counter_value(MaliExtBusWrBy, write_sample);
-        // Write counter is optional, continue even if it fails
 
         double current_read_bytes_per_sec = 0.0;
         double current_write_bytes_per_sec = 0.0;
@@ -157,15 +161,6 @@ public:
         } else if (write_sample.type == hwcpipe::counter_sample::type::float64) {
             current_write_bytes_per_sec = write_sample.value.float64;
         }
-
-        // Convert from bytes/second to MB/s
-        // The counters already return instantaneous bandwidth in bytes/second
-        auto delta_time_ns = current_time_ns - last_timestamp_ns_;
-        if (delta_time_ns == 0) {
-            return false; // No time elapsed
-        }
-
-        double delta_time_sec = static_cast<double>(delta_time_ns) / TimeConversion::NANOSECONDS_TO_SECONDS;
 
         data.read_bandwidth_mbps = (current_read_bytes_per_sec / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
         data.write_bandwidth_mbps = (current_write_bytes_per_sec / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
