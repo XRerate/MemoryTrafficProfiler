@@ -160,8 +160,15 @@ public:
 
         // Convert from bytes/second to MB/s
         // The counters already return instantaneous bandwidth in bytes/second
-        data.read_bandwidth_mbps = current_read_bytes_per_sec / BandwidthConversion::BYTES_TO_MB;
-        data.write_bandwidth_mbps = current_write_bytes_per_sec / BandwidthConversion::BYTES_TO_MB;
+        auto delta_time_ns = current_time_ns - last_timestamp_ns_;
+        if (delta_time_ns == 0) {
+            return false; // No time elapsed
+        }
+
+        double delta_time_sec = static_cast<double>(delta_time_ns) / TimeConversion::NANOSECONDS_TO_SECONDS;
+
+        data.read_bandwidth_mbps = (current_read_bytes_per_sec / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
+        data.write_bandwidth_mbps = (current_write_bytes_per_sec / delta_time_sec) / BandwidthConversion::BYTES_TO_MB;
         data.total_bandwidth_mbps = data.read_bandwidth_mbps + data.write_bandwidth_mbps;
         data.timestamp_ns = current_time_ns;
 
