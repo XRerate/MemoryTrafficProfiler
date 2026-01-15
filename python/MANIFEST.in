@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+recursive-include gpu_bandwidth_profiler *.py
+

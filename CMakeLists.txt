@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-project(GPUBandwidthProfiler VERSION 1.0.0 LANGUAGES CXX)
+project(GPUMemoryFootprintProfiler VERSION 1.0.0 LANGUAGES CXX)
 
 # Generate compile_commands.json for IDE support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -33,15 +33,24 @@ if(BUILD_MALI_BACKEND)
     set(MALI_LIBRARIES device hwcpipe)
 endif()
 
-# Find QProf
+# Find QProf (only for Android builds)
 if(BUILD_ADRENO_BACKEND)
-    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-    find_package(QProf)
-    if(NOT QProf_FOUND)
-        message(WARNING "QProf not found. Adreno backend will not be available.")
+    # QProf is only available for Android, so skip on desktop builds
+    if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+        list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+        find_package(QProf)
+        if(NOT QProf_FOUND)
+            message(WARNING "QProf not found. Adreno backend will not be available.")
+            set(BUILD_ADRENO_BACKEND OFF)
+        endif()
+    else()
+        message(STATUS "QProf is only available for Android builds. Adreno backend disabled.")
         set(BUILD_ADRENO_BACKEND OFF)
     endif()
 endif()
+
+# Note: For desktop builds, backends may not be available
+# The server can still be built but will fail to initialize if no backend is available
 
 # Backend sources
 set(BACKEND_SOURCES
@@ -63,12 +72,12 @@ if(BUILD_ADRENO_BACKEND)
 endif()
 
 # Main library
-add_library(GPUBandwidthProfiler
-    src/GPUBandwidthProfiler.cpp
+add_library(GPUMemoryFootprintProfiler
+    src/MemoryFootprintProfiler.cpp
     ${BACKEND_SOURCES}
 )
 
-target_include_directories(GPUBandwidthProfiler
+target_include_directories(GPUMemoryFootprintProfiler
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -76,24 +85,24 @@ target_include_directories(GPUBandwidthProfiler
 
 # Add compile definitions for backend availability
 if(BUILD_MALI_BACKEND)
-    target_compile_definitions(GPUBandwidthProfiler PRIVATE BUILD_MALI_BACKEND)
+    target_compile_definitions(GPUMemoryFootprintProfiler PRIVATE BUILD_MALI_BACKEND)
 endif()
 
 if(BUILD_ADRENO_BACKEND)
-    target_compile_definitions(GPUBandwidthProfiler PRIVATE BUILD_ADRENO_BACKEND)
+    target_compile_definitions(GPUMemoryFootprintProfiler PRIVATE BUILD_ADRENO_BACKEND)
 endif()
 
 # Link libraries
 if(BUILD_MALI_BACKEND)
-    target_link_libraries(GPUBandwidthProfiler PRIVATE ${MALI_LIBRARIES})
+    target_link_libraries(GPUMemoryFootprintProfiler PRIVATE ${MALI_LIBRARIES})
 endif()
 
 if(BUILD_ADRENO_BACKEND)
-    target_link_libraries(GPUBandwidthProfiler PRIVATE QProf::QProf)
+    target_link_libraries(GPUMemoryFootprintProfiler PRIVATE QProf::QProf)
 endif()
 
 # Threading library
-target_link_libraries(GPUBandwidthProfiler PUBLIC Threads::Threads)
+target_link_libraries(GPUMemoryFootprintProfiler PUBLIC Threads::Threads)
 
 # Build examples
 option(BUILD_EXAMPLES "Build example programs" ON)
@@ -102,19 +111,20 @@ if(BUILD_EXAMPLES)
 endif()
 
 # Install rules
-install(TARGETS GPUBandwidthProfiler
-    EXPORT GPUBandwidthProfilerTargets
+install(TARGETS GPUMemoryFootprintProfiler
+    EXPORT GPUMemoryFootprintProfilerTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include
 )
 
-install(FILES include/GPUBandwidthProfiler.h
+install(FILES include/MemoryFootprintProfiler.h
     DESTINATION include
 )
 
 install(FILES include/backends/backend.h
+        include/backends/constants.h
     DESTINATION include/backends
 )
 

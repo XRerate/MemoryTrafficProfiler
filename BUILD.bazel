@@ -59,11 +59,11 @@ cc_library(
     copts = ["-std=c++14"],
 )
 
-# Main GPUBandwidthProfiler library
+# Main GPUMemoryFootprintProfiler library
 cc_library(
-    name = "gpu_bandwidth_profiler",
-    srcs = ["src/GPUBandwidthProfiler.cpp"],
-    hdrs = ["include/GPUBandwidthProfiler.h"],
+    name = "gpu_memory_footprint_profiler",
+    srcs = ["src/MemoryFootprintProfiler.cpp"],
+    hdrs = ["include/MemoryFootprintProfiler.h"],
     deps = [
         ":backend_interface",
     ] + select({

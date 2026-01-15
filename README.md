@@ -12,14 +12,26 @@ A cross-platform GPU bandwidth profiler for Qualcomm Adreno and ARM Mali GPUs. T
 - **Default Pretty-Print**: Built-in formatted output for quick monitoring
 - **Cross-Platform**: Supports Android devices via NDK cross-compilation
 - **Accumulator Buffer**: Collect bandwidth samples into a user-provided buffer
-- **Statistics**: Calculate comprehensive statistics (min, max, avg, stddev) from accumulated data
 
 ## Build Systems
 
-This project supports both **CMake** and **Bazel** build systems:
+This project supports both **CMake** and **Bazel** build systems. See [BUILD_SYSTEMS.md](BUILD_SYSTEMS.md) for detailed information about both build systems.
 
-- **CMake**: See build instructions below
-- **Bazel**: See [README_BAZEL.md](README_BAZEL.md) for Bazel-specific instructions
+### Quick Start
+
+**CMake:**
+```bash
+mkdir build && cd build
+cmake .. -DBUILD_MALI_BACKEND=ON
+cmake --build .
+```
+
+**Bazel:**
+```bash
+bazel build --define=build_mali_backend=1 //:gpu_bandwidth_profiler
+```
+
+For detailed build instructions, Android builds, and server deployment, see [BUILD_SYSTEMS.md](BUILD_SYSTEMS.md).
 
 ## Prerequisites
 

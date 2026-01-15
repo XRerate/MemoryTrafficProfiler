@@ -1,6 +1,6 @@
-# Bazel module file for GPUBandwidthProfiler (Bzlmod)
+# Bazel module file for GPUMemoryFootprintProfiler (Bzlmod)
 module(
-    name = "gpu_bandwidth_profiler",
+    name = "gpu_memory_footprint_profiler",
     version = "1.0.0",
     compatibility_level = 1,
 )

@@ -1,0 +1,255 @@
+#!/bin/bash
+# ASS - Android Switch Serial
+# Script to switch ANDROID_SERIAL environment variable in a circular way
+# Cycles through available Android devices
+
+set -e
+
+# Get list of available devices
+get_devices() {
+    adb devices -l | grep -E "device\s" | awk '{print $1}' | sort
+}
+
+# Get current device
+get_current_device() {
+    echo "${ANDROID_SERIAL:-}"
+}
+
+# Switch to next device
+switch_device() {
+    local devices=($(get_devices))
+    local current=$(get_current_device)
+    local next_device=""
+    
+    if [ ${#devices[@]} -eq 0 ]; then
+        echo "ERROR: No Android devices found" >&2
+        return 1
+    fi
+    
+    # If no current device or current device not in list, use first device
+    if [ -z "$current" ] || ! echo "${devices[@]}" | grep -q "$current"; then
+        next_device="${devices[0]}"
+    else
+        # Find current device index
+        local current_idx=-1
+        for i in "${!devices[@]}"; do
+            if [ "${devices[$i]}" == "$current" ]; then
+                current_idx=$i
+                break
+            fi
+        done
+        
+        # Switch to next device (circular)
+        local next_idx=$(( (current_idx + 1) % ${#devices[@]} ))
+        next_device="${devices[$next_idx]}"
+    fi
+    
+    # Check if script is being sourced
+    if [ "${BASH_SOURCE[0]}" != "${0}" ] || [ -n "$ASS_SOURCED" ]; then
+        # Script is sourced - modify environment directly
+        export ANDROID_SERIAL="$next_device"
+        echo "Switched to: $ANDROID_SERIAL"
+    else
+        # Script is executed - output export command for eval
+        echo "export ANDROID_SERIAL=\"$next_device\""
+        echo "Switched to: $next_device" >&2
+        echo "" >&2
+        echo "NOTE: To actually switch, use: eval \$(./ass switch)" >&2
+    fi
+}
+
+# Show current device and available devices
+show_status() {
+    local devices=($(get_devices))
+    local current=$(get_current_device)
+    
+    echo "Available devices:"
+    for i in "${!devices[@]}"; do
+        local marker=""
+        if [ "${devices[$i]}" == "$current" ]; then
+            marker=" ← current"
+        fi
+        echo "  [$i] ${devices[$i]}$marker"
+    done
+    
+    if [ -z "$current" ]; then
+        echo ""
+        echo "Current ANDROID_SERIAL: (not set)"
+    else
+        echo ""
+        echo "Current ANDROID_SERIAL: $current"
+    fi
+}
+
+# Main function
+main() {
+    case "${1:-switch}" in
+        switch|next)
+            switch_device
+            ;;
+        status|list)
+            show_status
+            ;;
+        set)
+            if [ -z "$2" ]; then
+                echo "Usage: $0 set <device_serial>" >&2
+                echo "Available devices:" >&2
+                get_devices | while read dev; do
+                    echo "  $dev" >&2
+                done
+                return 1
+            fi
+            echo "export ANDROID_SERIAL=\"$2\""
+            echo "Set ANDROID_SERIAL to: $2" >&2
+            ;;
+        unset|clear)
+            echo "unset ANDROID_SERIAL"
+            echo "Cleared ANDROID_SERIAL" >&2
+            ;;
+        *)
+            echo "ASS - Android Switch Serial"
+            echo "Usage: $0 [command]"
+            echo ""
+            echo "Commands:"
+            echo "  switch, next  - Switch to next device (circular, default)"
+            echo "  status, list  - Show available devices and current selection"
+            echo "  set <serial> - Set ANDROID_SERIAL to specific device"
+            echo "  unset, clear - Clear ANDROID_SERIAL"
+            echo ""
+            echo "Examples:"
+            echo "  eval \$($0 switch)     # Switch to next device (use eval!)"
+            echo "  eval \$($0 next)      # Switch to next device"
+            echo "  $0 status             # Show current status"
+            echo "  eval \$($0 set R3CX80PSH7N)  # Set to specific device"
+            echo ""
+            echo ""
+            echo "To switch the serial, use one of these methods:"
+            echo "  1. eval \$(./ass switch)     # Execute and eval output"
+            echo "  2. source ./ass              # Source the script, then call functions"
+            echo ""
+            echo "After sourcing, you can use:"
+            echo "  switch_device switch         # Switch to next device"
+            echo "  show_status                 # Show current status"
+            return 1
+            ;;
+    esac
+}
+
+# Check if we should install as a function
+if [ "${1:-}" == "--install" ]; then
+    ASS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ass"
+    SHELL_RC=""
+    
+    if [ -n "$ZSH_VERSION" ]; then
+        SHELL_RC="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ]; then
+        SHELL_RC="$HOME/.bashrc"
+    fi
+    
+    if [ -z "$SHELL_RC" ]; then
+        echo "ERROR: Could not determine shell. Please add manually to your shell config."
+        exit 1
+    fi
+    
+    if grep -q "ASS - Android Switch Serial" "$SHELL_RC" 2>/dev/null; then
+        echo "ASS is already installed in $SHELL_RC"
+    else
+        echo "" >> "$SHELL_RC"
+        echo "# ASS - Android Switch Serial" >> "$SHELL_RC"
+        cat >> "$SHELL_RC" << ASSFUNC
+ass() {
+    local devices=(\$(adb devices -l | grep -E "device\\\\s" | awk '{print \$1}' | sort))
+    local current="${ANDROID_SERIAL:-}"
+    local next_device=""
+    
+    if [ ${#devices[@]} -eq 0 ]; then
+        echo "ERROR: No Android devices found" >&2
+        return 1
+    fi
+    
+    if [ -z "$current" ] || ! echo "${devices[@]}" | grep -q "$current"; then
+        next_device="${devices[0]}"
+    else
+        local current_idx=-1
+        for i in "${!devices[@]}"; do
+            if [ "${devices[$i]}" == "$current" ]; then
+                current_idx=$i
+                break
+            fi
+        done
+        local next_idx=$(( (current_idx + 1) % ${#devices[@]} ))
+        next_device="${devices[$next_idx]}"
+    fi
+    
+    export ANDROID_SERIAL="$next_device"
+    echo "Switched to: $ANDROID_SERIAL"
+}
+ASSFUNC
+        echo "Installed ASS function to $SHELL_RC"
+        echo "Run: source $SHELL_RC  or restart your shell"
+    fi
+    exit 0
+fi
+
+# If script is sourced, define functions in current shell
+if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+    # Redefine switch_device to work in sourced context
+    switch_device() {
+        local devices=($(get_devices))
+        local current=$(get_current_device)
+        local next_device=""
+        
+        if [ ${#devices[@]} -eq 0 ]; then
+            echo "ERROR: No Android devices found" >&2
+            return 1
+        fi
+        
+        if [ -z "$current" ] || ! echo "${devices[@]}" | grep -q "$current"; then
+            next_device="${devices[0]}"
+        else
+            local current_idx=-1
+            for i in "${!devices[@]}"; do
+                if [ "${devices[$i]}" == "$current" ]; then
+                    current_idx=$i
+                    break
+                fi
+            done
+            local next_idx=$(( (current_idx + 1) % ${#devices[@]} ))
+            next_device="${devices[$next_idx]}"
+        fi
+        
+        export ANDROID_SERIAL="$next_device"
+        echo "Switched to: $ANDROID_SERIAL"
+    }
+    
+    # Redefine show_status to work in sourced context  
+    show_status() {
+        local devices=($(get_devices))
+        local current=$(get_current_device)
+        
+        echo "Available devices:"
+        for i in "${!devices[@]}"; do
+            local marker=""
+            if [ "${devices[$i]}" == "$current" ]; then
+                marker=" ← current"
+            fi
+            echo "  [$i] ${devices[$i]}$marker"
+        done
+        
+        if [ -z "$current" ]; then
+            echo ""
+            echo "Current ANDROID_SERIAL: (not set)"
+        else
+            echo ""
+            echo "Current ANDROID_SERIAL: $current"
+        fi
+    }
+    
+    # If arguments provided when sourcing, run main
+    if [ $# -gt 0 ]; then
+        main "$@"
+    fi
+else
+    # Script is executed - run main
+    main "$@"
+fi

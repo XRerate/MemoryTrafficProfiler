@@ -1,10 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 cc_binary(
-    name = "gpu_bandwidth_example",
+    name = "gpu_memory_footprint_example",
     srcs = ["example.cpp"],
     deps = [
-        "//:gpu_bandwidth_profiler",
+        "//:gpu_memory_footprint_profiler",
     ],
     defines = select({
         "//:build_mali_backend": ["BUILD_MALI_BACKEND"],
