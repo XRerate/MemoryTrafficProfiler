@@ -1,6 +1,6 @@
-# Bazel module file for GPUMemoryFootprintProfiler (Bzlmod)
+# Bazel module file for MemoryTrafficProfiler (Bzlmod)
 module(
-    name = "gpu_memory_footprint_profiler",
+    name = "memory_traffic_profiler",
     version = "1.0.0",
     compatibility_level = 1,
 )

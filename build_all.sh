@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build script for Memory Footprint Profiler
+# Build script for Memory Traffic Profiler
 # Builds library and examples
 
 set -e
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "=========================================="
-echo "Memory Footprint Profiler - Build Script"
+echo "Memory Traffic Profiler - Build Script"
 echo "=========================================="
 echo ""
 
@@ -41,12 +41,12 @@ print_status "Bazel version: $(bazel version | head -1)"
 echo ""
 
 # Build library and example
-print_status "Building Memory Footprint Profiler library and example..."
-if bazel build //:gpu_memory_footprint_profiler //examples:gpu_memory_footprint_example 2>&1 | tee /tmp/build.log | tail -5; then
+print_status "Building Memory Traffic Profiler library and example..."
+if bazel build //:memory_traffic_profiler //examples:memory_traffic_example 2>&1 | tee /tmp/build.log | tail -5; then
     if grep -q "Build completed successfully" /tmp/build.log; then
         print_status "✓ Build successful"
-        echo "  Library: bazel-bin/libgpu_memory_footprint_profiler.a"
-        echo "  Example: bazel-bin/examples/gpu_memory_footprint_example"
+        echo "  Library: bazel-bin/libmemory_traffic_profiler.a"
+        echo "  Example: bazel-bin/examples/memory_traffic_example"
     else
         print_error "Build failed"
         exit 1

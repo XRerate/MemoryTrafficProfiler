@@ -1,4 +1,4 @@
-"""Setup script for Memory Footprint Profiler."""
+"""Setup script for Memory Traffic Profiler."""
 
 from setuptools import setup, find_packages
 from pathlib import Path
@@ -8,13 +8,12 @@ readme_file = Path(__file__).parent / "python" / "README.md"
 long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
-    name="gpu-memory-footprint-profiler",
+    name="memory-traffic-profiler",
     version="1.0.0",
-    description="Memory Footprint Profiler",
+    description="Memory Traffic Profiler",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="Memory Footprint Profiler Contributors",
-    url="https://github.com/yourusername/GPUMemoryFootprintProfiler",
+    author="Memory Traffic Profiler Contributors",
     packages=find_packages(where="python"),
     package_dir={"": "python"},
     python_requires=">=3.7",

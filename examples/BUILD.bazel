@@ -28,8 +28,3 @@ cc_binary(
     copts = ["-std=c++14"],
 )
 
-# Backward compatibility alias
-alias(
-    name = "gpu_memory_footprint_example",
-    actual = ":memory_traffic_example",
-)

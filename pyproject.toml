@@ -3,16 +3,16 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gpu-memory-footprint-profiler"
+name = "memory-traffic-profiler"
 version = "1.0.0"
-description = "Memory Footprint Profiler"
+description = "Memory Traffic Profiler"
 readme = "python/README.md"
 requires-python = ">=3.7"
 license = {text = "MIT"}
 authors = [
-    {name = "Memory Footprint Profiler Contributors"}
+    {name = "Memory Traffic Profiler Contributors"}
 ]
-keywords = ["gpu", "memory", "footprint", "profiler", "android", "performance"]
+keywords = ["gpu", "cpu", "npu", "memory", "traffic", "profiler", "android", "performance"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -41,5 +41,5 @@ package-dir = {"" = "python"}
 
 [tool.setuptools.packages.find]
 where = ["python"]
-include = ["gpu_memory_footprint_profiler*"]
+include = ["memory_traffic_profiler*"]
 

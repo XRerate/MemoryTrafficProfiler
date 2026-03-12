@@ -46,7 +46,7 @@ compile_commands.json
 *.exe
 *.out
 *.app
-gpu_memory_footprint_example
+memory_traffic_example
 
 # IDE files
 .vscode/

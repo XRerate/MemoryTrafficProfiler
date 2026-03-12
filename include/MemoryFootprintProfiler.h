@@ -129,6 +129,3 @@ class MemoryFootprintProfiler {
 };
 
 }  // namespace MemoryTrafficProfiler
-
-// Backward compatibility alias
-namespace GPUMemoryFootprintProfiler = MemoryTrafficProfiler;

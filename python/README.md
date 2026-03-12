@@ -1,6 +1,6 @@
-# GPU Bandwidth Profiler - Python Client
+# Memory Traffic Profiler - Python Client
 
-Python client library for controlling the GPU Bandwidth Profiler server running on Android devices.
+Python client library for controlling the Memory Traffic Profiler server running on Android devices.
 
 ## Installation
 
@@ -18,19 +18,13 @@ cd python
 pip install -e .
 ```
 
-### From PyPI (when published)
-
-```bash
-pip install gpu-bandwidth-profiler
-```
-
 ## Quick Start
 
 ```python
-from gpu_bandwidth_profiler import GPUBandwidthClient
+from memory_traffic_profiler import MemoryTrafficClient
 
 # Connect to server
-client = GPUBandwidthClient(host="localhost", port=8888)
+client = MemoryTrafficClient(host="localhost", port=8888)
 client.connect()
 
 # Start profiling
@@ -48,21 +42,12 @@ print(f"Collected {len(data)} samples")
 client.disconnect()
 ```
 
-## Command Line Tools
-
-After installation, you can use:
-
-```bash
-gpu-bandwidth-monitor [host] [port]  # Real-time monitoring
-gpu-bandwidth-view [host] [port]     # View collected data
-```
-
 ## Overview
 
 This client-server architecture allows you to:
-- Run the GPU Bandwidth Profiler server on an Android device
+- Run the Memory Traffic Profiler server on an Android device
 - Control profiling and retrieve data from a Python client on your host machine
-- Monitor GPU bandwidth remotely over a network connection
+- Monitor memory traffic (GPU, CPU, NPU) remotely over a network connection
 
 ## Architecture
 
@@ -73,39 +58,9 @@ This client-server architecture allows you to:
 └─────────────────┘                        └──────────────────┘
 ```
 
-## Setup
-
-### 1. Build and Deploy Server to Android Device
-
-```bash
-# Build server for Android (Mali backend)
-bazel build --config=android_mali //src/server:gpu_bandwidth_server
-
-# Deploy to device
-adb push bazel-bin/src/server/gpu_bandwidth_server /data/local/tmp/
-adb shell chmod +x /data/local/tmp/gpu_bandwidth_server
-```
-
-### 2. Start Server on Device
-
-```bash
-# Start server on device (default port 8888)
-adb shell /data/local/tmp/gpu_bandwidth_server
-
-# Or specify a custom port
-adb shell /data/local/tmp/gpu_bandwidth_server 9999
-```
-
-### 3. Forward Port (if connecting from host)
-
-```bash
-# Forward device port to host
-adb forward tcp:8888 tcp:8888
-```
-
 ## API Reference
 
-### GPUBandwidthClient
+### MemoryTrafficClient
 
 #### Methods
 
@@ -144,7 +99,7 @@ adb forward tcp:8888 tcp:8888
 
 ## Examples
 
-See `gpu_bandwidth_profiler/example.py` for a complete example.
+See `memory_traffic_profiler/example.py` for a complete example.
 
 ## License
 

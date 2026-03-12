@@ -133,9 +133,3 @@ cc_library(
     linkopts = ["-pthread"],
     copts = ["-std=c++14"],
 )
-
-# Backward compatibility alias
-alias(
-    name = "gpu_memory_footprint_profiler",
-    actual = ":memory_traffic_profiler",
-)

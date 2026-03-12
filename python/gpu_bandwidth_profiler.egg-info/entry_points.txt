@@ -1,3 +1,0 @@
-[console_scripts]
-gpu-bandwidth-monitor = gpu_bandwidth_profiler.monitor:main
-gpu-bandwidth-view = gpu_bandwidth_profiler.view_results:main

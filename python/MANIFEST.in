@@ -1,4 +1,4 @@
 include README.md
 include LICENSE
-recursive-include gpu_bandwidth_profiler *.py
+recursive-include memory_traffic_profiler *.py
 
