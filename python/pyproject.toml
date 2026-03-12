@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gpu-memory-footprint-profiler"
 version = "1.0.0"
-description = "GPU Memory Footprint Profiler"
+description = "Memory Footprint Profiler"
 readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "MIT"}
 authors = [
-    {name = "GPU Memory Footprint Profiler Contributors"}
+    {name = "Memory Footprint Profiler Contributors"}
 ]
 keywords = ["gpu", "memory", "footprint", "profiler", "android", "performance"]
 classifiers = [

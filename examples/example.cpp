@@ -5,7 +5,7 @@
 #include "MemoryFootprintProfiler.h"
 
 int main(int argc, char* argv[]) {
-  std::cout << "GPU Memory Footprint Profiler Example" << std::endl;
+  std::cout << "Memory Footprint Profiler Example" << std::endl;
   std::cout << "======================================" << std::endl << std::endl;
 
   // Create profiler instance

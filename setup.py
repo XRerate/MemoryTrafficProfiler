@@ -1,4 +1,4 @@
-"""Setup script for GPU Memory Footprint Profiler."""
+"""Setup script for Memory Footprint Profiler."""
 
 from setuptools import setup, find_packages
 from pathlib import Path
@@ -10,10 +10,10 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 setup(
     name="gpu-memory-footprint-profiler",
     version="1.0.0",
-    description="GPU Memory Footprint Profiler",
+    description="Memory Footprint Profiler",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="GPU Memory Footprint Profiler Contributors",
+    author="Memory Footprint Profiler Contributors",
     url="https://github.com/yourusername/GPUMemoryFootprintProfiler",
     packages=find_packages(where="python"),
     package_dir={"": "python"},

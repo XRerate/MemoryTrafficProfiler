@@ -1,6 +1,6 @@
 # ASS - Android Switch Serial
 # Add this to your ~/.bashrc or ~/.zshrc:
-#   source /path/to/GPUBandwidthProfiler/ass_function.sh
+#   source /path/to/MemoryTrafficProfiler/ass_function.sh
 
 ass() {
     local devices=($(adb devices -l | grep -E "device\s" | awk '{print $1}' | sort))

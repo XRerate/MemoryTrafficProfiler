@@ -11,7 +11,7 @@
 namespace GPUMemoryFootprintProfiler {
 
 /**
- * @brief GPU memory footprint profiler
+ * @brief Memory footprint profiler
  *
  * This class provides a unified interface for profiling GPU memory footprint
  * (total bytes read/written) from external memory (DRAM) on both Qualcomm

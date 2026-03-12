@@ -1,10 +1,10 @@
 CompileFlags:
   CompilationDatabase: .
   Add:
-    - -I/home/spl/GPUBandwidthProfiler/include
-    - -I/home/spl/GPUBandwidthProfiler/include/backends
-    - -I/home/spl/GPUBandwidthProfiler/third_party/libGPUCounters/hwcpipe/include
-    - -I/home/spl/GPUBandwidthProfiler/third_party/libGPUCounters/backend/device/include
+    - -I/home/spl/MemoryTrafficProfiler/include
+    - -I/home/spl/MemoryTrafficProfiler/include/backends
+    - -I/home/spl/MemoryTrafficProfiler/third_party/libGPUCounters/hwcpipe/include
+    - -I/home/spl/MemoryTrafficProfiler/third_party/libGPUCounters/backend/device/include
     - -I/opt/qcom/Shared/QualcommProfiler/API/include
     - -std=c++14
     - -DBUILD_MALI_BACKEND

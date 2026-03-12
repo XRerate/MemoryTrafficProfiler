@@ -10,7 +10,7 @@ cmake-build-*/
 bazel-bin
 bazel-out
 bazel-testlogs
-bazel-GPUBandwidthProfiler
+bazel-MemoryTrafficProfiler
 MODULE.bazel.lock
 
 # CMake generated files
@@ -46,7 +46,7 @@ compile_commands.json
 *.exe
 *.out
 *.app
-gpu_bandwidth_example
+gpu_memory_footprint_example
 
 # IDE files
 .vscode/

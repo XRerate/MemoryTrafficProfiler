@@ -22,7 +22,7 @@ struct BandwidthData {
 using BandwidthCallback = std::function<void(const BandwidthData&)>;
 
 /**
- * @brief Abstract base class for GPU bandwidth backends
+ * @brief Abstract base class for memory bandwidth backends
  */
 class Backend {
  public:
