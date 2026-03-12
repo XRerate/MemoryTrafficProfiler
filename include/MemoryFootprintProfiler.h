@@ -8,7 +8,7 @@
 
 #include "backends/backend.h"
 
-namespace GPUMemoryFootprintProfiler {
+namespace MemoryTrafficProfiler {
 
 /**
  * @brief Memory footprint profiler
@@ -37,6 +37,13 @@ class MemoryFootprintProfiler {
    * Initialize() will return false.
    */
   bool Initialize();
+
+  /**
+   * @brief Initialize the profiler with a specific backend category
+   * @param category The backend category to use (GPU, CPU, NPU)
+   * @return true if initialization successful, false otherwise
+   */
+  bool Initialize(BackendCategory category);
 
   /**
    * @brief Start memory footprint profiling
@@ -93,6 +100,13 @@ class MemoryFootprintProfiler {
   bool autoInitialize();
 
   /**
+   * @brief Initialize with a specific backend category
+   * @param category The backend category to use
+   * @return true if initialization successful, false otherwise
+   */
+  bool initializeByCategory(BackendCategory category);
+
+  /**
    * @brief Initialize the profiler with a specific backend (internal)
    * @param backend Backend to use (AdrenoBackend or MaliBackend)
    * @return true if initialization successful, false otherwise
@@ -114,4 +128,7 @@ class MemoryFootprintProfiler {
   mutable std::mutex mutex_;
 };
 
-}  // namespace GPUMemoryFootprintProfiler
+}  // namespace MemoryTrafficProfiler
+
+// Backward compatibility alias
+namespace GPUMemoryFootprintProfiler = MemoryTrafficProfiler;

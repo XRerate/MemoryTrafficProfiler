@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-project(GPUMemoryFootprintProfiler VERSION 1.0.0 LANGUAGES CXX)
+project(MemoryTrafficProfiler VERSION 1.0.0 LANGUAGES CXX)
 
 # Generate compile_commands.json for IDE support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -15,6 +15,8 @@ find_package(Threads REQUIRED)
 # Options
 option(BUILD_ADRENO_BACKEND "Build Adreno backend (requires QProf)" ON)
 option(BUILD_MALI_BACKEND "Build Mali backend (requires libGPUCounters)" ON)
+option(BUILD_CPU_BACKEND "Build CPU backend (perf_event_open, Linux only)" ON)
+option(BUILD_NPU_BACKEND "Build NPU backend (requires QProf)" ON)
 
 # Include directories
 include_directories(
@@ -33,19 +35,28 @@ if(BUILD_MALI_BACKEND)
     set(MALI_LIBRARIES device hwcpipe)
 endif()
 
-# Find QProf (only for Android builds)
-if(BUILD_ADRENO_BACKEND)
-    # QProf is only available for Android, so skip on desktop builds
+# Find QProf (only for Android builds, shared by Adreno and NPU backends)
+if(BUILD_ADRENO_BACKEND OR BUILD_NPU_BACKEND)
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
         list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
         find_package(QProf)
         if(NOT QProf_FOUND)
-            message(WARNING "QProf not found. Adreno backend will not be available.")
+            message(WARNING "QProf not found. Adreno and NPU backends will not be available.")
             set(BUILD_ADRENO_BACKEND OFF)
+            set(BUILD_NPU_BACKEND OFF)
         endif()
     else()
-        message(STATUS "QProf is only available for Android builds. Adreno backend disabled.")
+        message(STATUS "QProf is only available for Android builds. Adreno and NPU backends disabled.")
         set(BUILD_ADRENO_BACKEND OFF)
+        set(BUILD_NPU_BACKEND OFF)
+    endif()
+endif()
+
+# CPU backend only available on Linux
+if(BUILD_CPU_BACKEND)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+        message(STATUS "CPU backend requires Linux. Disabled.")
+        set(BUILD_CPU_BACKEND OFF)
     endif()
 endif()
 
@@ -71,13 +82,27 @@ if(BUILD_ADRENO_BACKEND)
     )
 endif()
 
+if(BUILD_CPU_BACKEND)
+    list(APPEND BACKEND_SOURCES
+        include/backends/cpu.h
+        src/backends/cpu.cpp
+    )
+endif()
+
+if(BUILD_NPU_BACKEND)
+    list(APPEND BACKEND_SOURCES
+        include/backends/npu.h
+        src/backends/npu.cpp
+    )
+endif()
+
 # Main library
-add_library(GPUMemoryFootprintProfiler
+add_library(MemoryTrafficProfiler
     src/MemoryFootprintProfiler.cpp
     ${BACKEND_SOURCES}
 )
 
-target_include_directories(GPUMemoryFootprintProfiler
+target_include_directories(MemoryTrafficProfiler
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -85,24 +110,39 @@ target_include_directories(GPUMemoryFootprintProfiler
 
 # Add compile definitions for backend availability
 if(BUILD_MALI_BACKEND)
-    target_compile_definitions(GPUMemoryFootprintProfiler PRIVATE BUILD_MALI_BACKEND)
+    target_compile_definitions(MemoryTrafficProfiler PRIVATE BUILD_MALI_BACKEND)
 endif()
 
 if(BUILD_ADRENO_BACKEND)
-    target_compile_definitions(GPUMemoryFootprintProfiler PRIVATE BUILD_ADRENO_BACKEND)
+    target_compile_definitions(MemoryTrafficProfiler PRIVATE BUILD_ADRENO_BACKEND)
+endif()
+
+if(BUILD_CPU_BACKEND)
+    target_compile_definitions(MemoryTrafficProfiler PRIVATE BUILD_CPU_BACKEND)
+endif()
+
+if(BUILD_NPU_BACKEND)
+    target_compile_definitions(MemoryTrafficProfiler PRIVATE BUILD_NPU_BACKEND)
 endif()
 
 # Link libraries
 if(BUILD_MALI_BACKEND)
-    target_link_libraries(GPUMemoryFootprintProfiler PRIVATE ${MALI_LIBRARIES})
+    target_link_libraries(MemoryTrafficProfiler PRIVATE ${MALI_LIBRARIES})
 endif()
 
 if(BUILD_ADRENO_BACKEND)
-    target_link_libraries(GPUMemoryFootprintProfiler PRIVATE QProf::QProf)
+    target_link_libraries(MemoryTrafficProfiler PRIVATE QProf::QProf)
+endif()
+
+if(BUILD_NPU_BACKEND)
+    if(NOT BUILD_ADRENO_BACKEND)
+        # Only link QProf if not already linked by Adreno
+        target_link_libraries(MemoryTrafficProfiler PRIVATE QProf::QProf)
+    endif()
 endif()
 
 # Threading library
-target_link_libraries(GPUMemoryFootprintProfiler PUBLIC Threads::Threads)
+target_link_libraries(MemoryTrafficProfiler PUBLIC Threads::Threads)
 
 # Build examples
 option(BUILD_EXAMPLES "Build example programs" ON)
@@ -111,8 +151,8 @@ if(BUILD_EXAMPLES)
 endif()
 
 # Install rules
-install(TARGETS GPUMemoryFootprintProfiler
-    EXPORT GPUMemoryFootprintProfilerTargets
+install(TARGETS MemoryTrafficProfiler
+    EXPORT MemoryTrafficProfilerTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
@@ -140,3 +180,14 @@ if(BUILD_ADRENO_BACKEND)
     )
 endif()
 
+if(BUILD_CPU_BACKEND)
+    install(FILES include/backends/cpu.h
+        DESTINATION include/backends
+    )
+endif()
+
+if(BUILD_NPU_BACKEND)
+    install(FILES include/backends/npu.h
+        DESTINATION include/backends
+    )
+endif()

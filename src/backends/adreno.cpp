@@ -10,7 +10,7 @@
 
 #include "backends/backend.h"
 
-namespace GPUMemoryFootprintProfiler {
+namespace MemoryTrafficProfiler {
 
 // QProf metric IDs
 namespace QProfMetrics {
@@ -20,6 +20,7 @@ constexpr uint16_t GPU_DDR_BANDWIDTH_METRIC_ID = 4663;
 
 // QProf configuration constants
 namespace QProfConfig {
+constexpr const char* CAPABILITY_NAME = "profiler:apps-proc-ddr-metrics";
 // Streaming rate: Stream results every 200ms
 constexpr uint32_t STREAMING_RATE_MS = 200;
 // Sampling rate: Sample every 10ms
@@ -180,11 +181,22 @@ class AdrenoBackend::Impl {
     qp_setResultCallback(context_request_, ResultCallback);
     qp_setMessageCallback(context_request_, MessageCallback);
 
-    // Configure start configuration (from working example)
+    // Validate that the capability is available on this device
+    if (!validateCapability()) {
+      fprintf(stderr,
+              "QProf Adreno: capability '%s' not found on this device\n",
+              QProfConfig::CAPABILITY_NAME);
+      qp_destroy(context_request_);
+      delete context_request_;
+      context_request_ = nullptr;
+      return false;
+    }
+
+    // Configure start configuration
     start_config_ = new ProfilingEventStartConfiguration();
     start_config_->capabilityName.capabilityNameLen =
         snprintf((char*)start_config_->capabilityName.capabilityName,
-                 CAPABILITY_NAME_LENGTH, "profiler:apps-proc-ddr-metrics");
+                 CAPABILITY_NAME_LENGTH, "%s", QProfConfig::CAPABILITY_NAME);
     start_config_->metricIds.metricIdsLen = 1;
     start_config_->metricIds.metricIds[0] =
         QProfMetrics::GPU_DDR_BANDWIDTH_METRIC_ID;
@@ -198,7 +210,7 @@ class AdrenoBackend::Impl {
     stop_config_ = new ProfilingEventStopConfiguration();
     stop_config_->capabilityName.capabilityNameLen =
         snprintf((char*)stop_config_->capabilityName.capabilityName,
-                 CAPABILITY_NAME_LENGTH, "profiler:apps-proc-ddr-metrics");
+                 CAPABILITY_NAME_LENGTH, "%s", QProfConfig::CAPABILITY_NAME);
     stop_config_->metricIds.metricIdsLen = 0;
 
     return true;
@@ -297,6 +309,23 @@ class AdrenoBackend::Impl {
   bool is_profiling() const { return is_profiling_; }
 
  private:
+  bool validateCapability() {
+    CapabilitiesResponse response = {};
+    eReturnCode ret = qp_getCapabilities(context_request_, &response);
+    if (ret != RETURN_CODE_SUCCESS) {
+      return false;
+    }
+
+    for (uint8_t i = 0; i < response.capabilitiesLen; i++) {
+      if (strcmp((const char*)response.capabilities[i]
+                    .capabilityName.capabilityName,
+                QProfConfig::CAPABILITY_NAME) == 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   uint64_t get_timestamp_ns() {
     auto now = std::chrono::steady_clock::now();
     auto duration = now.time_since_epoch();
@@ -329,4 +358,8 @@ bool AdrenoBackend::is_profiling() const { return pimpl_->is_profiling(); }
 
 const char* AdrenoBackend::get_name() const { return "Adreno"; }
 
-}  // namespace GPUMemoryFootprintProfiler
+BackendCategory AdrenoBackend::get_category() const {
+  return BackendCategory::GPU;
+}
+
+}  // namespace MemoryTrafficProfiler

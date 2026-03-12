@@ -1,25 +1,58 @@
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <thread>
 
 #include "MemoryFootprintProfiler.h"
 
+using namespace MemoryTrafficProfiler;
+
+void printUsage(const char* program) {
+  std::cout << "Usage: " << program << " [backend]" << std::endl;
+  std::cout << "  backend: gpu, cpu, npu (default: auto-detect)" << std::endl;
+}
+
 int main(int argc, char* argv[]) {
-  std::cout << "Memory Footprint Profiler Example" << std::endl;
-  std::cout << "======================================" << std::endl << std::endl;
+  std::cout << "Memory Traffic Profiler Example" << std::endl;
+  std::cout << "======================================" << std::endl
+            << std::endl;
 
   // Create profiler instance
-  GPUMemoryFootprintProfiler::MemoryFootprintProfiler p;
+  MemoryFootprintProfiler p;
 
   // Initialize profiler
-  if (!p.Initialize()) {
+  bool initialized = false;
+  if (argc > 1) {
+    if (strcmp(argv[1], "gpu") == 0) {
+      std::cout << "Requesting GPU backend..." << std::endl;
+      initialized = p.Initialize(BackendCategory::GPU);
+    } else if (strcmp(argv[1], "cpu") == 0) {
+      std::cout << "Requesting CPU backend..." << std::endl;
+      initialized = p.Initialize(BackendCategory::CPU);
+    } else if (strcmp(argv[1], "npu") == 0) {
+      std::cout << "Requesting NPU backend..." << std::endl;
+      initialized = p.Initialize(BackendCategory::NPU);
+    } else if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+      printUsage(argv[0]);
+      return 0;
+    } else {
+      std::cerr << "Unknown backend: " << argv[1] << std::endl;
+      printUsage(argv[0]);
+      return 1;
+    }
+  } else {
+    std::cout << "Auto-detecting backend..." << std::endl;
+    initialized = p.Initialize();
+  }
+
+  if (!initialized) {
     std::cerr << "Error: Failed to initialize profiler." << std::endl;
     std::cerr << "This may be because:" << std::endl;
-    std::cerr << "  - No GPU device is available" << std::endl;
+    std::cerr << "  - No supported device is available" << std::endl;
     std::cerr
         << "  - Required libraries (libGPUCounters or QProf) are not available"
         << std::endl;
-    std::cerr << "  - Insufficient permissions to access GPU device"
+    std::cerr << "  - Insufficient permissions to access device counters"
               << std::endl;
     return 1;
   }
@@ -52,14 +85,14 @@ int main(int argc, char* argv[]) {
 
   std::cout << "=== Memory Footprint ===" << std::endl;
   std::cout << std::fixed << std::setprecision(2);
-  std::cout << "Read Memory Footprint:  " << std::setw(15) 
-            << read_footprint / (1024.0 * 1024.0) << " MB (" 
+  std::cout << "Read Memory Footprint:  " << std::setw(15)
+            << read_footprint / (1024.0 * 1024.0) << " MB ("
             << read_footprint << " bytes)" << std::endl;
-  std::cout << "Write Memory Footprint: " << std::setw(15) 
-            << write_footprint / (1024.0 * 1024.0) << " MB (" 
+  std::cout << "Write Memory Footprint: " << std::setw(15)
+            << write_footprint / (1024.0 * 1024.0) << " MB ("
             << write_footprint << " bytes)" << std::endl;
-  std::cout << "Total Memory Footprint: " << std::setw(15) 
-            << total_footprint / (1024.0 * 1024.0) << " MB (" 
+  std::cout << "Total Memory Footprint: " << std::setw(15)
+            << total_footprint / (1024.0 * 1024.0) << " MB ("
             << total_footprint << " bytes)" << std::endl;
 
   std::cout << std::endl;

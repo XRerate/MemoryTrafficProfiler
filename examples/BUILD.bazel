@@ -1,10 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 cc_binary(
-    name = "gpu_memory_footprint_example",
+    name = "memory_traffic_example",
     srcs = ["example.cpp"],
     deps = [
-        "//:gpu_memory_footprint_profiler",
+        "//:memory_traffic_profiler",
     ],
     defines = select({
         "//:build_mali_backend": ["BUILD_MALI_BACKEND"],
@@ -12,6 +12,24 @@ cc_binary(
     }) + select({
         "//:build_adreno_backend": ["BUILD_ADRENO_BACKEND"],
         "//conditions:default": [],
+    }) + select({
+        "//:build_cpu_backend": ["BUILD_CPU_BACKEND"],
+        "//conditions:default": [],
+    }) + select({
+        "//:build_npu_backend": ["BUILD_NPU_BACKEND"],
+        "//conditions:default": [],
     }),
 )
 
+# CPU memory bandwidth stress test
+cc_binary(
+    name = "cpu_memstress",
+    srcs = ["cpu_memstress.cpp"],
+    copts = ["-std=c++14"],
+)
+
+# Backward compatibility alias
+alias(
+    name = "gpu_memory_footprint_example",
+    actual = ":memory_traffic_example",
+)

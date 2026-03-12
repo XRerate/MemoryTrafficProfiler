@@ -11,7 +11,7 @@
 #include "backends/backend.h"
 #include "backends/constants.h"
 
-namespace GPUMemoryFootprintProfiler {
+namespace MemoryTrafficProfiler {
 
 class MaliBackend::Impl {
  public:
@@ -33,7 +33,6 @@ class MaliBackend::Impl {
   bool initialize() {
     // Check if GPU is available
     if (!gpu_) {
-      fprintf(stderr, "DEBUG: GPU device not available\n");
       return false;
     }
 
@@ -220,4 +219,6 @@ bool MaliBackend::is_profiling() const { return pimpl_->is_profiling(); }
 
 const char* MaliBackend::get_name() const { return "Mali"; }
 
-}  // namespace GPUMemoryFootprintProfiler
+BackendCategory MaliBackend::get_category() const { return BackendCategory::GPU; }
+
+}  // namespace MemoryTrafficProfiler

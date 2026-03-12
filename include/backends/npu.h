@@ -7,12 +7,19 @@
 namespace MemoryTrafficProfiler {
 
 /**
- * @brief Mali GPU backend using libGPUCounters
+ * @brief NPU backend using QProf API with AXI bandwidth metrics
+ *
+ * Measures NPU (Qualcomm HTP/Hexagon) memory bandwidth using QProf
+ * AXI request counters:
+ *   - 4141: AXI 128Byte read request
+ *   - 4142: AXI 128Byte write request
+ *   - 4143: AXI 256Byte write request
+ *   - 4144: AXI 256Byte read request
  */
-class MaliBackend : public Backend {
+class NpuBackend : public Backend {
  public:
-  MaliBackend();
-  ~MaliBackend() override;
+  NpuBackend();
+  ~NpuBackend() override;
 
   bool initialize() override;
   bool start() override;

@@ -4,7 +4,12 @@
 #include <functional>
 #include <memory>
 
-namespace GPUMemoryFootprintProfiler {
+namespace MemoryTrafficProfiler {
+
+/**
+ * @brief Backend category for device type identification
+ */
+enum class BackendCategory { GPU, CPU, NPU };
 
 /**
  * @brief Structure to hold bandwidth data
@@ -64,6 +69,12 @@ class Backend {
    * @return Name of the backend
    */
   virtual const char* get_name() const = 0;
+
+  /**
+   * @brief Get backend category
+   * @return Category of the backend (GPU, CPU, NPU)
+   */
+  virtual BackendCategory get_category() const = 0;
 };
 
-}  // namespace GPUMemoryFootprintProfiler
+}  // namespace MemoryTrafficProfiler

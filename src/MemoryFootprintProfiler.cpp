@@ -5,9 +5,15 @@
 #ifdef BUILD_ADRENO_BACKEND
 #include "backends/adreno.h"
 #endif
+#ifdef BUILD_CPU_BACKEND
+#include "backends/cpu.h"
+#endif
+#ifdef BUILD_NPU_BACKEND
+#include "backends/npu.h"
+#endif
 #include <chrono>
 
-namespace GPUMemoryFootprintProfiler {
+namespace MemoryTrafficProfiler {
 
 // Constants for memory footprint calculation
 namespace {
@@ -40,25 +46,76 @@ bool MemoryFootprintProfiler::Initialize() {
   return autoInitialize();
 }
 
+bool MemoryFootprintProfiler::Initialize(BackendCategory category) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  if (is_profiling_) {
+    return false;  // Cannot initialize while profiling
+  }
+
+  if (backend_) {
+    return true;  // Already initialized
+  }
+
+  return initializeByCategory(category);
+}
+
 bool MemoryFootprintProfiler::autoInitialize() {
   // Try to initialize with available backends
-  // Try Mali first, then Adreno
+  // Try Mali first, then Adreno, then CPU, then NPU
 
 #ifdef BUILD_MALI_BACKEND
   auto mali_backend = std::make_unique<MaliBackend>();
   if (initialize(std::move(mali_backend))) {
-    return true;  // Successfully initialized with Mali
+    return true;
   }
 #endif
 
 #ifdef BUILD_ADRENO_BACKEND
   auto adreno_backend = std::make_unique<AdrenoBackend>();
   if (initialize(std::move(adreno_backend))) {
-    return true;  // Successfully initialized with Adreno
+    return true;
   }
 #endif
 
-  // No backend available - backend_ remains nullptr
+#ifdef BUILD_CPU_BACKEND
+  auto cpu_backend = std::make_unique<CpuBackend>();
+  if (initialize(std::move(cpu_backend))) {
+    return true;
+  }
+#endif
+
+#ifdef BUILD_NPU_BACKEND
+  auto npu_backend = std::make_unique<NpuBackend>();
+  if (initialize(std::move(npu_backend))) {
+    return true;
+  }
+#endif
+
+  return false;
+}
+
+bool MemoryFootprintProfiler::initializeByCategory(BackendCategory category) {
+  switch (category) {
+    case BackendCategory::GPU:
+#ifdef BUILD_MALI_BACKEND
+      if (initialize(std::make_unique<MaliBackend>())) return true;
+#endif
+#ifdef BUILD_ADRENO_BACKEND
+      if (initialize(std::make_unique<AdrenoBackend>())) return true;
+#endif
+      break;
+    case BackendCategory::CPU:
+#ifdef BUILD_CPU_BACKEND
+      if (initialize(std::make_unique<CpuBackend>())) return true;
+#endif
+      break;
+    case BackendCategory::NPU:
+#ifdef BUILD_NPU_BACKEND
+      if (initialize(std::make_unique<NpuBackend>())) return true;
+#endif
+      break;
+  }
   return false;
 }
 
@@ -208,4 +265,4 @@ void MemoryFootprintProfiler::samplingThread() {
   }
 }
 
-}  // namespace GPUMemoryFootprintProfiler
+}  // namespace MemoryTrafficProfiler

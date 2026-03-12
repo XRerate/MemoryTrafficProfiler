@@ -14,6 +14,8 @@ common --cxxopt=-Wno-unknown-warning-option
 # Build options
 common:build_mali_backend --define=build_mali_backend=1
 common:build_adreno_backend --define=build_adreno_backend=1
+common:build_cpu_backend --define=build_cpu_backend=1
+common:build_npu_backend --define=build_npu_backend=1
 
 # Android configuration using Android NDK toolchain
 # The Android NDK is configured via MODULE.bazel using rules_android_ndk
@@ -31,3 +33,11 @@ common:android_mali --config=build_mali_backend
 # Adreno backend with Android
 common:android_adreno --config=android_arm64
 common:android_adreno --config=build_adreno_backend
+
+# CPU backend with Android
+common:android_cpu --config=android_arm64
+common:android_cpu --config=build_cpu_backend
+
+# NPU backend with Android
+common:android_npu --config=android_arm64
+common:android_npu --config=build_npu_backend

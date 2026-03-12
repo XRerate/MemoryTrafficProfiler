@@ -13,6 +13,16 @@ config_setting(
     define_values = {"build_adreno_backend": "1"},
 )
 
+config_setting(
+    name = "build_cpu_backend",
+    define_values = {"build_cpu_backend": "1"},
+)
+
+config_setting(
+    name = "build_npu_backend",
+    define_values = {"build_npu_backend": "1"},
+)
+
 platform(
     name = "android_arm64_platform",
     constraint_values = [
@@ -59,9 +69,36 @@ cc_library(
     copts = ["-std=c++14"],
 )
 
-# Main GPUMemoryFootprintProfiler library
+# CPU backend
 cc_library(
-    name = "gpu_memory_footprint_profiler",
+    name = "cpu_backend",
+    srcs = ["src/backends/cpu.cpp"],
+    hdrs = ["include/backends/cpu.h"],
+    deps = [
+        ":backend_interface",
+    ],
+    defines = ["BUILD_CPU_BACKEND"],
+    includes = ["include"],
+    copts = ["-std=c++14"],
+)
+
+# NPU backend
+cc_library(
+    name = "npu_backend",
+    srcs = ["src/backends/npu.cpp"],
+    hdrs = ["include/backends/npu.h"],
+    deps = [
+        ":backend_interface",
+        "@qprof//:qprof",
+    ],
+    defines = ["BUILD_NPU_BACKEND"],
+    includes = ["include"],
+    copts = ["-std=c++14"],
+)
+
+# Main MemoryTrafficProfiler library
+cc_library(
+    name = "memory_traffic_profiler",
     srcs = ["src/MemoryFootprintProfiler.cpp"],
     hdrs = ["include/MemoryFootprintProfiler.h"],
     deps = [
@@ -72,6 +109,12 @@ cc_library(
     }) + select({
         ":build_adreno_backend": [":adreno_backend"],
         "//conditions:default": [],
+    }) + select({
+        ":build_cpu_backend": [":cpu_backend"],
+        "//conditions:default": [],
+    }) + select({
+        ":build_npu_backend": [":npu_backend"],
+        "//conditions:default": [],
     }),
     defines = select({
         ":build_mali_backend": ["BUILD_MALI_BACKEND"],
@@ -79,9 +122,20 @@ cc_library(
     }) + select({
         ":build_adreno_backend": ["BUILD_ADRENO_BACKEND"],
         "//conditions:default": [],
+    }) + select({
+        ":build_cpu_backend": ["BUILD_CPU_BACKEND"],
+        "//conditions:default": [],
+    }) + select({
+        ":build_npu_backend": ["BUILD_NPU_BACKEND"],
+        "//conditions:default": [],
     }),
     includes = ["include"],
     linkopts = ["-pthread"],
     copts = ["-std=c++14"],
 )
 
+# Backward compatibility alias
+alias(
+    name = "gpu_memory_footprint_profiler",
+    actual = ":memory_traffic_profiler",
+)
