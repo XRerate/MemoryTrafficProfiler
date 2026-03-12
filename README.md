@@ -1,53 +1,32 @@
-# GPU Bandwidth Profiler
+# Memory Footprint Profiler
 
-A cross-platform GPU bandwidth profiler for Qualcomm Adreno and ARM Mali GPUs. This profiler provides real-time monitoring of GPU external memory (DRAM) bandwidth with support for custom callbacks and pretty-printing.
+A cross-platform memory footprint profiler for Android devices. Measures total bytes read/written from external memory (DRAM) during a profiling session. Currently supports GPU backends (Qualcomm Adreno, ARM Mali), with CPU and NPU backends planned.
 
 ## Features
 
-- **Singleton Design**: Easy-to-use singleton interface
-- **Dual Backend Support**: 
+- **Dual Backend Support**:
   - Qualcomm Adreno GPU (using QProf API)
   - ARM Mali GPU (using libGPUCounters)
-- **Callback Mechanism**: Register custom callbacks for bandwidth data
-- **Default Pretty-Print**: Built-in formatted output for quick monitoring
+- **Auto-Detection**: Automatically detects and initializes the appropriate backend (tries Mali first, then Adreno)
+- **Memory Footprint Accumulation**: Tracks cumulative read/write bytes via background sampling thread
 - **Cross-Platform**: Supports Android devices via NDK cross-compilation
-- **Accumulator Buffer**: Collect bandwidth samples into a user-provided buffer
-
-## Build Systems
-
-This project supports both **CMake** and **Bazel** build systems. See [BUILD_SYSTEMS.md](BUILD_SYSTEMS.md) for detailed information about both build systems.
-
-### Quick Start
-
-**CMake:**
-```bash
-mkdir build && cd build
-cmake .. -DBUILD_MALI_BACKEND=ON
-cmake --build .
-```
-
-**Bazel:**
-```bash
-bazel build --define=build_mali_backend=1 //:gpu_bandwidth_profiler
-```
-
-For detailed build instructions, Android builds, and server deployment, see [BUILD_SYSTEMS.md](BUILD_SYSTEMS.md).
+- **Dual Build System**: Both CMake and Bazel supported
 
 ## Prerequisites
 
 ### Common Requirements
 
-- **CMake** (version 3.13 or higher)
 - **C++14** compatible compiler
 - **Android NDK** (for Android builds)
   - Set `ANDROID_NDK` environment variable to your NDK path
-  - Example: `export ANDROID_NDK=/path/to/android-ndk-r25c`
+- **CMake** (version 3.13 or higher) for CMake builds
+- **Bazel** for Bazel builds
 
 ### Qualcomm Adreno Backend Requirements
 
-The Adreno backend requires the Qualcomm Profiler (QProf) API. You need to set the following environment variables:
+The Adreno backend requires the Qualcomm Profiler (QProf) API.
 
-#### Required Environment Variables
+#### Environment Variables
 
 1. **`QPROF_HOME`** (Optional, defaults to `/opt/qcom/Shared/QualcommProfiler/API`)
    - Path to the QProf API directory
@@ -63,7 +42,6 @@ The Adreno backend requires the Qualcomm Profiler (QProf) API. You need to set t
 
 #### QProf Directory Structure
 
-The QProf installation should have the following structure:
 ```
 /opt/qcom/Shared/QualcommProfiler/
 └── API/
@@ -76,70 +54,30 @@ The QProf installation should have the following structure:
                 └── libQualcommProfilerCore.so
 ```
 
-**Note**: The default path is `/opt/qcom/Shared/QualcommProfiler/API`. If your QProf is installed elsewhere, set `QPROF_HOME` to point to the `API` directory (not the parent directory).
-
-#### Setting Up QProf Environment
-
-Add to your `~/.bashrc` or `~/.zshrc`:
-```bash
-# Qualcomm QProf Configuration
-# Only set if QProf is not installed in the default location
-export QPROF_HOME=/opt/qcom/Shared/QualcommProfiler/API
-
-# Optional: specify library path explicitly
-# export QPROF_LIBRARY=$QPROF_HOME/target-la/aarch64/libs/libQualcommProfilerApi.so
-```
-
 ### ARM Mali Backend Requirements
 
-The Mali backend uses `libGPUCounters` which is automatically downloaded from GitHub during the build process. No additional environment variables or manual setup is required.
+The Mali backend uses `libGPUCounters` which is automatically downloaded during the build process. No additional setup is required.
 
 ## Building
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/XRerate/GPUBandwidthProfiler.git
-cd GPUBandwidthProfiler
-```
-
-**Note:** Dependencies (libGPUCounters) are automatically downloaded during the build process, so no submodule initialization is needed.
-
 ### Build Options
 
-The project supports the following CMake options:
+**CMake options:**
 
 - `BUILD_ADRENO_BACKEND` (default: ON) - Build Adreno backend (requires QProf)
 - `BUILD_MALI_BACKEND` (default: ON) - Build Mali backend (requires libGPUCounters)
 - `BUILD_EXAMPLES` (default: ON) - Build example applications
 
-### Building for Android
+**Bazel configs (defined in `.bazelrc`):**
 
-#### Using Build Scripts
+- `--config=android_arm64` - Android ARM64 platform
+- `--config=android_mali` - Mali backend on Android
+- `--config=android_adreno` - Adreno backend on Android
 
-We provide convenience scripts for specific devices:
-
-**For Google Pixel 8 Pro (Mali GPU):**
-```bash
-./build-pixel8pro.sh
-```
-
-**For Samsung Galaxy S25 (Adreno GPU):**
-```bash
-./build-s25.sh
-```
-
-These scripts will:
-1. Check for required environment variables
-2. Configure CMake for Android cross-compilation
-3. Build the project
-4. Provide instructions for deployment
-
-#### Manual Android Build
+### Build with CMake (Android)
 
 ```bash
-mkdir build-android
-cd build-android
+mkdir build-android && cd build-android
 
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
@@ -151,51 +89,52 @@ cmake .. \
 make -j$(nproc)
 ```
 
-### Building for Linux (Native)
+### Build with CMake (Linux Native)
 
 ```bash
-mkdir build
-cd build
-
-cmake .. \
-    -DBUILD_ADRENO_BACKEND=ON \
-    -DBUILD_MALI_BACKEND=ON
-
+mkdir build && cd build
+cmake .. -DBUILD_ADRENO_BACKEND=ON -DBUILD_MALI_BACKEND=ON
 make -j$(nproc)
 ```
 
 **Note**: Native Linux builds are primarily for development. The profiler is designed for Android devices.
+
+### Build with Bazel
+
+```bash
+# Build library only
+bazel build --config=android_mali //:gpu_memory_footprint_profiler
+
+# Build library and example
+bazel build --config=android_mali //:gpu_memory_footprint_profiler //examples:gpu_memory_footprint_example
+```
+
+Or use the convenience script:
+```bash
+./build_all.sh
+```
 
 ## Deployment to Android Device
 
 ### Deploy Executable
 
 ```bash
-adb push build-android/examples/gpu_bandwidth_example /data/local/tmp/
-adb shell chmod +x /data/local/tmp/gpu_bandwidth_example
+adb push build-android/examples/gpu_memory_footprint_example /data/local/tmp/
+adb shell chmod +x /data/local/tmp/gpu_memory_footprint_example
 ```
 
 ### Deploy QProf Libraries (Adreno Backend Only)
 
-For Adreno devices, you also need to push the QProf libraries:
-
 ```bash
-# Set QPROF_HOME if not already set (or use default path)
 QPROF_HOME=${QPROF_HOME:-/opt/qcom/Shared/QualcommProfiler/API}
-
-# Push QProf API library
 adb push $QPROF_HOME/target-la/aarch64/libs/libQualcommProfilerApi.so /data/local/tmp/
-
-# Push QProf Core library (dependency)
 adb push $QPROF_HOME/target-la/aarch64/libs/libQualcommProfilerCore.so /data/local/tmp/
 ```
-
-**Note**: The build scripts (e.g., `build-s25.sh`) will automatically provide the correct push commands based on your `QPROF_HOME` setting.
 
 ### Run on Device
 
 ```bash
-adb shell /data/local/tmp/gpu_bandwidth_example
+adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp ./gpu_memory_footprint_example"
 ```
 
 ## Usage
@@ -203,78 +142,81 @@ adb shell /data/local/tmp/gpu_bandwidth_example
 ### Basic Example
 
 ```cpp
-#include "GPUBandwidthProfiler.h"
-#include "backends/mali.h"  // or "backends/adreno.h"
-
-using namespace GPUBandwidthProfiler;
+#include "MemoryFootprintProfiler.h"
 
 int main() {
-    auto& profiler = GPUBandwidthProfiler::getInstance();
-    
-    // Initialize with Mali backend
-    if (!profiler.initialize(std::make_unique<MaliBackend>())) {
+    // Create profiler instance
+    GPUMemoryFootprintProfiler::MemoryFootprintProfiler p;
+
+    // Initialize (auto-detects backend: tries Mali first, then Adreno)
+    if (!p.Initialize()) {
         std::cerr << "Failed to initialize profiler" << std::endl;
-        return -1;
+        return 1;
     }
-    
-    // Start profiling with 200ms sampling interval
-    profiler.start(200);
-    
+
+    std::cout << "Using backend: " << p.GetBackendName() << std::endl;
+
+    // Start profiling
+    p.Start();
+
     // ... your code here ...
-    
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
     // Stop profiling
-    profiler.stop();
-    
+    p.Stop();
+
+    // Get accumulated memory footprint
+    uint64_t read_bytes = p.GetReadMemoryFootprint();
+    uint64_t write_bytes = p.GetWriteMemoryFootprint();
+    uint64_t total_bytes = p.GetTotalMemoryFootprint();
+
+    std::cout << "Read:  " << read_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
+    std::cout << "Write: " << write_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
+    std::cout << "Total: " << total_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
+
     return 0;
 }
 ```
 
-### Custom Callback
+### API Reference
 
-```cpp
-void myCallback(const BandwidthData& data) {
-    std::cout << "Read: " << data.read_bandwidth_mbps 
-              << " MB/s, Write: " << data.write_bandwidth_mbps 
-              << " MB/s" << std::endl;
-}
-
-// Register custom callback
-profiler.registerCallback(myCallback);
-profiler.start(100);
-```
+| Method | Description |
+|--------|-------------|
+| `Initialize()` | Auto-detect and initialize the appropriate GPU backend |
+| `Start()` | Start memory footprint profiling (background sampling thread) |
+| `Stop()` | Stop profiling |
+| `GetReadMemoryFootprint()` | Get total bytes read from DRAM |
+| `GetWriteMemoryFootprint()` | Get total bytes written to DRAM |
+| `GetTotalMemoryFootprint()` | Get total bytes (read + write) |
+| `IsProfiling()` | Check if profiling is currently active |
+| `GetBackendName()` | Get the name of the active backend |
 
 ## Troubleshooting
 
 ### QProf Not Found
 
-If CMake reports that QProf is not found:
-
 1. Verify `QPROF_HOME` is set (or check default location):
    ```bash
    echo $QPROF_HOME
-   # Default is: /opt/qcom/Shared/QualcommProfiler/API
+   # Default: /opt/qcom/Shared/QualcommProfiler/API
    ```
 
-2. Check that the directory exists and contains the required structure:
+2. Check the directory structure:
    ```bash
    ls -la $QPROF_HOME/include/QProfilerApi.h
    ls -la $QPROF_HOME/target-la/aarch64/libs/libQualcommProfilerApi.so
    ```
 
-3. If using a custom library path, set `QPROF_LIBRARY`:
-   ```bash
-   export QPROF_LIBRARY=/path/to/libQualcommProfilerApi.so
-   ```
+3. Ensure you're building for Android aarch64 (arm64-v8a), as QProf only supports Android ARM64.
 
-4. Ensure you're building for Android aarch64 (arm64-v8a), as QProf only supports Android ARM64 targets.
-
-### Adreno Backend Shows 0.00 MB/s
+### Adreno Backend Shows 0 Bytes
 
 - Ensure the device has an Adreno GPU (not Mali)
 - Check that QProf libraries are pushed to the device
+- Verify `LD_LIBRARY_PATH` includes the directory containing QProf libraries
 - Verify the device has the required permissions to access GPU profiling
 
-### Mali Backend Shows 0.00 MB/s
+### Mali Backend Shows 0 Bytes
 
 - Ensure the device has a Mali GPU (not Adreno)
 - Check that the device has `/dev/mali0` or similar GPU device node
@@ -282,53 +224,43 @@ If CMake reports that QProf is not found:
 
 ### Dependency Issues
 
-If you encounter issues with `libGPUCounters`:
+**CMake:** libGPUCounters is auto-downloaded via FetchContent. If download fails, check your internet connection or clear cache: `rm -rf build-*/_deps/libgpucounters-*`
 
-**For CMake builds:**
-- libGPUCounters is automatically downloaded via FetchContent
-- If download fails, check your internet connection
-- You can clear the cache: `rm -rf build-*/_deps/libgpucounters-*`
-
-**For Bazel builds:**
-- libGPUCounters is fetched from the local registry
-- Ensure the registry is properly configured in `.bazelrc`
+**Bazel:** libGPUCounters is fetched from the local registry configured in `.bazelrc`.
 
 ## Project Structure
 
 ```
-GPUBandwidthProfiler/
+MemoryTrafficProfiler/
 ├── include/
-│   ├── GPUBandwidthProfiler.h      # Main profiler interface
+│   ├── MemoryFootprintProfiler.h      # Main profiler interface
 │   └── backends/
-│       ├── backend.h               # Abstract backend interface
-│       ├── adreno.h                # Adreno backend header
-│       └── mali.h                  # Mali backend header
+│       ├── backend.h                   # Abstract backend interface
+│       ├── constants.h                 # Unit conversion constants
+│       ├── adreno.h                    # Adreno backend header
+│       └── mali.h                      # Mali backend header
 ├── src/
-│   ├── GPUBandwidthProfiler.cpp   # Main profiler implementation
+│   ├── MemoryFootprintProfiler.cpp     # Main profiler implementation
 │   └── backends/
-│       ├── adreno.cpp              # Adreno backend implementation
-│       └── mali.cpp                # Mali backend implementation
+│       ├── adreno.cpp                  # Adreno backend implementation
+│       └── mali.cpp                    # Mali backend implementation
 ├── examples/
-│   └── example.cpp                 # Example usage
-├── third_party/
-│   └── modules/                    # Bazel registry modules (libgpu_counters, etc.)
+│   ├── example.cpp                     # Example usage
+│   ├── CMakeLists.txt                  # Example CMake config
+│   └── BUILD.bazel                     # Example Bazel config
+├── python/                             # Python client package
 ├── cmake/
-│   └── FindQProf.cmake            # CMake module for finding QProf
-├── build-pixel8pro.sh              # Build script for Pixel 8 Pro
-├── build-s25.sh                    # Build script for Galaxy S25
-└── CMakeLists.txt                 # Main CMake configuration
+│   └── FindQProf.cmake                 # CMake module for finding QProf
+├── bazel/                              # Bazel dependency configs
+├── third_party/                        # Local Bazel registry modules
+├── CMakeLists.txt                      # Main CMake configuration
+├── BUILD.bazel                         # Main Bazel configuration
+├── MODULE.bazel                        # Bazel module definition
+├── .bazelrc                            # Bazel settings and configs
+└── build_all.sh                        # Convenience build script
 ```
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
 
 ## Acknowledgments
 
 - ARM Software for libGPUCounters
 - Qualcomm for QProf API
-
