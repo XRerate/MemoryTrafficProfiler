@@ -29,15 +29,22 @@ constexpr uint32_t STREAMING_RATE_MS = 200;
 constexpr uint32_t SAMPLING_RATE_MS = 1;
 }  // namespace NpuQProfConfig
 
-// Global callback data for NPU metrics (values in MB/s from QProf)
+// Global callback data: accumulate-consume pattern with fallback
 static struct {
   std::mutex mutex;
-  double axi_128b_read;   // AXI 128B read bandwidth (MB/s)
-  double axi_128b_write;  // AXI 128B write bandwidth (MB/s)
-  double axi_256b_write;  // AXI 256B write bandwidth (MB/s)
-  double axi_256b_read;   // AXI 256B read bandwidth (MB/s)
-  uint64_t last_timestamp_ns;
-  bool has_data;
+  // Per-metric accumulators (written by callback, consumed by sample)
+  double axi_128b_read_sum;
+  uint32_t axi_128b_read_count;
+  double axi_128b_write_sum;
+  uint32_t axi_128b_write_count;
+  double axi_256b_write_sum;
+  uint32_t axi_256b_write_count;
+  double axi_256b_read_sum;
+  uint32_t axi_256b_read_count;
+  // Fallback (written by sample, read by sample when no new data)
+  double last_avg_read_mbps;
+  double last_avg_write_mbps;
+  bool has_ever_received_data;
 } g_npu_callback_data;
 
 // Result callback to receive NPU profiling data
@@ -82,23 +89,26 @@ void NpuResultCallback(LpProfilingResult profilingResult) {
 
         switch (metric_id) {
           case NpuMetrics::AXI_128B_READ_REQUEST:
-            g_npu_callback_data.axi_128b_read = value;
+            g_npu_callback_data.axi_128b_read_sum += value;
+            g_npu_callback_data.axi_128b_read_count++;
             break;
           case NpuMetrics::AXI_128B_WRITE_REQUEST:
-            g_npu_callback_data.axi_128b_write = value;
+            g_npu_callback_data.axi_128b_write_sum += value;
+            g_npu_callback_data.axi_128b_write_count++;
             break;
           case NpuMetrics::AXI_256B_WRITE_REQUEST:
-            g_npu_callback_data.axi_256b_write = value;
+            g_npu_callback_data.axi_256b_write_sum += value;
+            g_npu_callback_data.axi_256b_write_count++;
             break;
           case NpuMetrics::AXI_256B_READ_REQUEST:
-            g_npu_callback_data.axi_256b_read = value;
+            g_npu_callback_data.axi_256b_read_sum += value;
+            g_npu_callback_data.axi_256b_read_count++;
             break;
           default:
             continue;
         }
 
-        g_npu_callback_data.last_timestamp_ns = timestamp;
-        g_npu_callback_data.has_data = true;
+        g_npu_callback_data.has_ever_received_data = true;
       }
     }
   }
@@ -121,12 +131,17 @@ class NpuBackend::Impl {
         stop_config_(nullptr),
         is_profiling_(false),
         last_timestamp_ns_(0) {
-    g_npu_callback_data.axi_128b_read = 0;
-    g_npu_callback_data.axi_128b_write = 0;
-    g_npu_callback_data.axi_256b_write = 0;
-    g_npu_callback_data.axi_256b_read = 0;
-    g_npu_callback_data.last_timestamp_ns = 0;
-    g_npu_callback_data.has_data = false;
+    g_npu_callback_data.axi_128b_read_sum = 0.0;
+    g_npu_callback_data.axi_128b_read_count = 0;
+    g_npu_callback_data.axi_128b_write_sum = 0.0;
+    g_npu_callback_data.axi_128b_write_count = 0;
+    g_npu_callback_data.axi_256b_write_sum = 0.0;
+    g_npu_callback_data.axi_256b_write_count = 0;
+    g_npu_callback_data.axi_256b_read_sum = 0.0;
+    g_npu_callback_data.axi_256b_read_count = 0;
+    g_npu_callback_data.last_avg_read_mbps = 0.0;
+    g_npu_callback_data.last_avg_write_mbps = 0.0;
+    g_npu_callback_data.has_ever_received_data = false;
   }
 
   ~Impl() {
@@ -247,25 +262,66 @@ class NpuBackend::Impl {
       return false;
     }
 
-    uint64_t current_time_ns = get_timestamp_ns();
-    uint64_t delta_time_ns = current_time_ns - last_timestamp_ns_;
-    if (delta_time_ns == 0) {
-      return false;
-    }
-
     double read_mbps = 0.0;
     double write_mbps = 0.0;
 
     {
       std::lock_guard<std::mutex> lock(g_npu_callback_data.mutex);
-      if (g_npu_callback_data.has_data) {
-        // QProf AXI metrics are already in MB/s, just sum by direction
-        read_mbps = g_npu_callback_data.axi_128b_read +
-                    g_npu_callback_data.axi_256b_read;
-        write_mbps = g_npu_callback_data.axi_128b_write +
-                     g_npu_callback_data.axi_256b_write;
+
+      if (!g_npu_callback_data.has_ever_received_data) {
+        return false;  // No data has ever arrived from QProf yet
+      }
+
+      bool has_new_data = (g_npu_callback_data.axi_128b_read_count > 0 ||
+                           g_npu_callback_data.axi_128b_write_count > 0 ||
+                           g_npu_callback_data.axi_256b_read_count > 0 ||
+                           g_npu_callback_data.axi_256b_write_count > 0);
+
+      if (has_new_data) {
+        // Compute per-metric averages
+        double avg_128b_read = g_npu_callback_data.axi_128b_read_count > 0
+            ? g_npu_callback_data.axi_128b_read_sum / g_npu_callback_data.axi_128b_read_count
+            : 0.0;
+        double avg_128b_write = g_npu_callback_data.axi_128b_write_count > 0
+            ? g_npu_callback_data.axi_128b_write_sum / g_npu_callback_data.axi_128b_write_count
+            : 0.0;
+        double avg_256b_read = g_npu_callback_data.axi_256b_read_count > 0
+            ? g_npu_callback_data.axi_256b_read_sum / g_npu_callback_data.axi_256b_read_count
+            : 0.0;
+        double avg_256b_write = g_npu_callback_data.axi_256b_write_count > 0
+            ? g_npu_callback_data.axi_256b_write_sum / g_npu_callback_data.axi_256b_write_count
+            : 0.0;
+
+        read_mbps = avg_128b_read + avg_256b_read;
+        write_mbps = avg_128b_write + avg_256b_write;
+
+#ifndef NDEBUG
+        fprintf(stderr, "[NPU] avg_rd=%.2f  avg_wr=%.2f MB/s  samples=%u  delta_ms=%.1f\n",
+                read_mbps, write_mbps, g_npu_callback_data.axi_128b_read_count,
+                static_cast<double>(get_timestamp_ns() - last_timestamp_ns_) / 1e6);
+#endif
+
+        // Reset all accumulators
+        g_npu_callback_data.axi_128b_read_sum = 0.0;
+        g_npu_callback_data.axi_128b_read_count = 0;
+        g_npu_callback_data.axi_128b_write_sum = 0.0;
+        g_npu_callback_data.axi_128b_write_count = 0;
+        g_npu_callback_data.axi_256b_read_sum = 0.0;
+        g_npu_callback_data.axi_256b_read_count = 0;
+        g_npu_callback_data.axi_256b_write_sum = 0.0;
+        g_npu_callback_data.axi_256b_write_count = 0;
+
+        // Store as fallback
+        g_npu_callback_data.last_avg_read_mbps = read_mbps;
+        g_npu_callback_data.last_avg_write_mbps = write_mbps;
+      } else {
+        // No new data since last consume: use fallback
+        read_mbps = g_npu_callback_data.last_avg_read_mbps;
+        write_mbps = g_npu_callback_data.last_avg_write_mbps;
       }
     }
+
+    uint64_t current_time_ns = get_timestamp_ns();
 
     data.read_bandwidth_mbps = read_mbps;
     data.write_bandwidth_mbps = write_mbps;

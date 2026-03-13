@@ -27,28 +27,21 @@ constexpr uint32_t STREAMING_RATE_MS = 200;
 constexpr uint32_t SAMPLING_RATE_MS = 10;
 }  // namespace QProfConfig
 
-// Precision constants for bandwidth calculations
-namespace BandwidthPrecision {
-// Multiplier to preserve 6 decimal places (MB/s * 1000000)
-constexpr double PRECISION_MULTIPLIER = 1000000.0;
-// Divisor to convert back from precision format
-constexpr double PRECISION_DIVISOR = 1000000.0;
-}  // namespace BandwidthPrecision
-
 // Bandwidth distribution constants
 namespace BandwidthDistribution {
 // Split total bandwidth equally between read and write
 constexpr double READ_WRITE_SPLIT_RATIO = 2.0;
 }  // namespace BandwidthDistribution
 
-// Global callback data (simplified - in production, use thread-local or
-// instance-specific)
+// Global callback data: accumulate-consume pattern with fallback
 static struct {
   std::mutex mutex;
-  uint64_t read_bytes;
-  uint64_t write_bytes;
-  uint64_t last_timestamp_ns;
-  bool has_data;
+  // Accumulator (written by callback, consumed by sample)
+  double bandwidth_sum;         // sum of all bandwidth MB/s samples
+  uint32_t sample_count;        // number of samples accumulated
+  // Fallback (written by sample, read by sample when no new data)
+  double last_avg_bandwidth;    // last computed average MB/s
+  bool has_ever_received_data;  // one-way latch: true once first data arrives
 } g_callback_data;
 
 // Result callback to receive profiling data
@@ -77,35 +70,27 @@ void ResultCallback(LpProfilingResult profilingResult) {
             profilingResult->profilingResultGeneric->metricResponse[index]
                 .timestamp;
 
-        // Check for GPU DDR bandwidth metric
-        // Note: This appears to be total bandwidth, not separate read/write
-        // If separate read/write metrics exist (e.g., 4661, 4662), they should
-        // be added
+        double raw_value = 0.0;
+        switch (data_type) {
+          case DATA_TYPE_UINT64:
+            raw_value = static_cast<double>(
+                profilingResult->profilingResultGeneric->metricResponse[index]
+                    .value.uint64Value);
+            break;
+          case DATA_TYPE_DOUBLE:
+            raw_value =
+                profilingResult->profilingResultGeneric->metricResponse[index]
+                    .value.doubleValue;
+            break;
+          default:
+            break;
+        }
+
+        // Accumulate GPU DDR bandwidth metric
         if (metric_id == QProfMetrics::GPU_DDR_BANDWIDTH_METRIC_ID) {
-          double bandwidth_value = 0.0;
-          switch (data_type) {
-            case DATA_TYPE_UINT64:
-              bandwidth_value = static_cast<double>(
-                  profilingResult->profilingResultGeneric->metricResponse[index]
-                      .value.uint64Value);
-              break;
-            case DATA_TYPE_DOUBLE:
-              bandwidth_value =
-                  profilingResult->profilingResultGeneric->metricResponse[index]
-                      .value.doubleValue;
-              break;
-            default:
-              break;
-          }
-          // Store the total bandwidth value directly (QProf returns in MB/s)
-          // Store as integer * PRECISION_MULTIPLIER to preserve precision (6
-          // decimal places)
-          g_callback_data.read_bytes = static_cast<uint64_t>(
-              bandwidth_value * BandwidthPrecision::PRECISION_MULTIPLIER);
-          g_callback_data.write_bytes =
-              0;  // Total is stored in read_bytes, write will be calculated
-          g_callback_data.last_timestamp_ns = timestamp;
-          g_callback_data.has_data = true;
+          g_callback_data.bandwidth_sum += raw_value;
+          g_callback_data.sample_count++;
+          g_callback_data.has_ever_received_data = true;
         }
       }
     }
@@ -130,14 +115,11 @@ class AdrenoBackend::Impl {
         start_config_(nullptr),
         stop_config_(nullptr),
         is_profiling_(false),
-        last_read_bytes_(0),
-        last_write_bytes_(0),
         last_timestamp_ns_(0) {
-    // Initialize callback data
-    g_callback_data.read_bytes = 0;
-    g_callback_data.write_bytes = 0;
-    g_callback_data.last_timestamp_ns = 0;
-    g_callback_data.has_data = false;
+    g_callback_data.bandwidth_sum = 0.0;
+    g_callback_data.sample_count = 0;
+    g_callback_data.last_avg_bandwidth = 0.0;
+    g_callback_data.has_ever_received_data = false;
   }
 
   ~Impl() {
@@ -231,8 +213,6 @@ class AdrenoBackend::Impl {
     }
 
     is_profiling_ = true;
-    last_read_bytes_ = 0;
-    last_write_bytes_ = 0;
     last_timestamp_ns_ = get_timestamp_ns();
 
     return true;
@@ -257,50 +237,46 @@ class AdrenoBackend::Impl {
       return false;
     }
 
-    // Get current timestamp
-    uint64_t current_time_ns = get_timestamp_ns();
-    uint64_t delta_time_ns = current_time_ns - last_timestamp_ns_;
-
-    if (delta_time_ns == 0) {
-      return false;  // No time elapsed
-    }
-
-    // Get latest values from callback
-    // Note: The QProf GPU DDR bandwidth metric returns total bandwidth in MB/s
-    // (MBps) directly
-    double current_total_bandwidth_mbps = 0.0;
+    double total_bandwidth_mbps = 0.0;
 
     {
       std::lock_guard<std::mutex> lock(g_callback_data.mutex);
-      if (g_callback_data.has_data) {
-        // The callback stores total bandwidth in MB/s (stored as integer *
-        // PRECISION_MULTIPLIER for precision)
-        current_total_bandwidth_mbps =
-            static_cast<double>(g_callback_data.read_bytes) /
-            BandwidthPrecision::PRECISION_DIVISOR;
+
+      if (!g_callback_data.has_ever_received_data) {
+        return false;  // No data has ever arrived from QProf yet
+      }
+
+      if (g_callback_data.sample_count > 0) {
+        // New data: compute average and consume
+        total_bandwidth_mbps = g_callback_data.bandwidth_sum /
+                               static_cast<double>(g_callback_data.sample_count);
+
+#ifndef NDEBUG
+        fprintf(stderr, "[GPU] avg=%.2f MB/s  samples=%u  delta_ms=%.1f\n",
+                total_bandwidth_mbps, g_callback_data.sample_count,
+                static_cast<double>(get_timestamp_ns() - last_timestamp_ns_) / 1e6);
+#endif
+
+        // Reset accumulators
+        g_callback_data.bandwidth_sum = 0.0;
+        g_callback_data.sample_count = 0;
+        // Store as fallback
+        g_callback_data.last_avg_bandwidth = total_bandwidth_mbps;
+      } else {
+        // No new data since last consume: use fallback
+        total_bandwidth_mbps = g_callback_data.last_avg_bandwidth;
       }
     }
 
-    // QProf already returns values in MB/s, use directly
-    // Split total bandwidth equally between read and write (since we don't have
-    // separate metrics)
-    data.read_bandwidth_mbps = current_total_bandwidth_mbps /
+    uint64_t current_time_ns = get_timestamp_ns();
+
+    data.read_bandwidth_mbps = total_bandwidth_mbps /
                                BandwidthDistribution::READ_WRITE_SPLIT_RATIO;
-    data.write_bandwidth_mbps = current_total_bandwidth_mbps /
+    data.write_bandwidth_mbps = total_bandwidth_mbps /
                                 BandwidthDistribution::READ_WRITE_SPLIT_RATIO;
-    data.total_bandwidth_mbps = current_total_bandwidth_mbps;
+    data.total_bandwidth_mbps = total_bandwidth_mbps;
     data.timestamp_ns = current_time_ns;
 
-    // Update last values for reference (store in MB/s * PRECISION_MULTIPLIER
-    // for precision)
-    last_read_bytes_ =
-        static_cast<uint64_t>(current_total_bandwidth_mbps *
-                              BandwidthPrecision::PRECISION_MULTIPLIER /
-                              BandwidthDistribution::READ_WRITE_SPLIT_RATIO);
-    last_write_bytes_ =
-        static_cast<uint64_t>(current_total_bandwidth_mbps *
-                              BandwidthPrecision::PRECISION_MULTIPLIER /
-                              BandwidthDistribution::READ_WRITE_SPLIT_RATIO);
     last_timestamp_ns_ = current_time_ns;
 
     return true;
@@ -337,8 +313,6 @@ class AdrenoBackend::Impl {
   LpProfilingEventStartConfiguration start_config_;
   LpProfilingEventStopConfiguration stop_config_;
   bool is_profiling_;
-  uint64_t last_read_bytes_;
-  uint64_t last_write_bytes_;
   uint64_t last_timestamp_ns_;
 };
 

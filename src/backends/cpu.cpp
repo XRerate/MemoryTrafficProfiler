@@ -162,6 +162,11 @@ class CpuBackend::Impl {
     double bandwidth_mbps = bytes_transferred / delta_time_sec /
                             BandwidthConversion::BYTES_TO_MB;
 
+#ifndef NDEBUG
+    fprintf(stderr, "[CPU] delta_count=%lu  delta_ms=%.1f  bw=%.1f MB/s\n",
+            (unsigned long)delta_count, delta_time_sec * 1000.0, bandwidth_mbps);
+#endif
+
     // bus_access is a combined read+write counter, report as total
     data.read_bandwidth_mbps = bandwidth_mbps;
     data.write_bandwidth_mbps = 0.0;

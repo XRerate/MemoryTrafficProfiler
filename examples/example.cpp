@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
 
   {
     // Target code to profile
-    std::cout << "Running target code for 3 seconds..." << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::cout << "Running target code for 1 second..." << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
   p.Stop();
