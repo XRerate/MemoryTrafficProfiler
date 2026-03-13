@@ -77,10 +77,10 @@ No external library dependencies.
 
 **CMake options:**
 
-- `BUILD_ADRENO_BACKEND` (default: ON) - Build Adreno backend (requires QProf, Android only)
-- `BUILD_MALI_BACKEND` (default: ON) - Build Mali backend (requires libGPUCounters)
 - `BUILD_CPU_BACKEND` (default: ON) - Build CPU backend (Linux/Android only)
-- `BUILD_NPU_BACKEND` (default: ON) - Build NPU backend (requires QProf, Android only)
+- `BUILD_ADRENO_BACKEND` (default: OFF) - Build Adreno backend (requires QProf, Android only)
+- `BUILD_MALI_BACKEND` (default: OFF) - Build Mali backend (requires libGPUCounters)
+- `BUILD_NPU_BACKEND` (default: OFF) - Build NPU backend (requires QProf, Android only)
 - `BUILD_EXAMPLES` (default: ON) - Build example applications
 
 **Bazel configs (defined in `.bazelrc`):**
@@ -100,9 +100,9 @@ cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
     -DANDROID_ABI=arm64-v8a \
     -DANDROID_PLATFORM=android-21 \
+    -DBUILD_CPU_BACKEND=ON \
     -DBUILD_ADRENO_BACKEND=ON \
     -DBUILD_MALI_BACKEND=ON \
-    -DBUILD_CPU_BACKEND=ON \
     -DBUILD_NPU_BACKEND=ON
 
 make -j$(nproc)
@@ -112,11 +112,11 @@ make -j$(nproc)
 
 ```bash
 mkdir build && cd build
-cmake .. -DBUILD_CPU_BACKEND=ON
+cmake ..
 make -j$(nproc)
 ```
 
-**Note**: Native Linux builds are primarily for development. GPU and NPU backends require Android.
+**Note**: By default only the CPU backend is enabled. GPU and NPU backends require Android.
 
 ### Build with Bazel
 

@@ -13,10 +13,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Threads REQUIRED)
 
 # Options
-option(BUILD_ADRENO_BACKEND "Build Adreno backend (requires QProf)" ON)
-option(BUILD_MALI_BACKEND "Build Mali backend (requires libGPUCounters)" ON)
 option(BUILD_CPU_BACKEND "Build CPU backend (perf_event_open, Linux only)" ON)
-option(BUILD_NPU_BACKEND "Build NPU backend (requires QProf)" ON)
+option(BUILD_ADRENO_BACKEND "Build Adreno backend (requires QProf, Android only)" OFF)
+option(BUILD_MALI_BACKEND "Build Mali backend (requires libGPUCounters)" OFF)
+option(BUILD_NPU_BACKEND "Build NPU backend (requires QProf, Android only)" OFF)
 
 # Include directories
 include_directories(
