@@ -243,6 +243,46 @@ int main() {
 | CPU | ARMv8 CPU | CPU | Combined R+W via `bus_access` PMU | Reports total in read field; write = 0 (not separable) |
 | NPU | Qualcomm HTP/Hexagon | NPU | Read/Write BW via QProf AXI counters | Requires QProf libraries on device |
 
+## Measurement
+
+Bandwidth measured by this profiler is compared against latency-implied bandwidth (`data_size / kernel_latency`) on matvec workloads. Device: Galaxy S25+ (Snapdragon 8 Elite).
+
+### CPU (`bus_access` PMU counter)
+
+Workload: TVM matvec kernel (1×1024×3072).
+
+| Kernel | Latency | BW (from latency) | BW (`bus_access`) | BW (QProf) |
+|--------|---------|--------------------|--------------------|-------------|
+| 1x1024x3072_cand001_neon+dotprod.so | 0.2 ms | 63 GB/s | 54 GB/s | 30 GB/s |
+| 1x1024x3072_cand100_neon+dotprod.so | 3.2 ms | 4 GB/s | 7 GB/s | 4 GB/s |
+
+- `bus_access` seems to read ~2× higher than actual bandwidth (https://github.com/seonjunn/android-bwprobe/blob/master/docs/pmu.md#37-spatial-burst-amplification).
+- The fast kernel has large launch overhead relative to compute, diluting the measured bandwidth.
+
+### GPU — Adreno (QProf)
+
+Workload: TVM matvec kernel (1×1024×4096).
+
+| Kernel | Latency | BW (from latency) | BW (QProf) |
+|--------|---------|--------------------| ------------|
+| 1x1024x4096_cand001_base.so | 0.24 ms | 70 GB/s | 25 GB/s |
+
+- Launch overhead dilutes the measured bandwidth for short-running kernels.
+
+### NPU — Qualcomm HTP (QProf AXI counters)
+
+Workload: QNN-compiled matvec, 200 layers.
+
+| Kernel | Latency (QNN client) | BW (from latency) | BW (QProf) |
+|--------|----------------------|--------------------|------------|
+| 1×1024×4096 | 100 ms | 33 GB/s | 24 GB/s |
+| 1×8×4096 | 6 ms | 4 GB/s | 2.5 GB/s |
+
+### Notes
+
+- **Bandwidth ordering is consistent**: the ranking of kernels by profiled bandwidth matches the ranking by latency-implied bandwidth.
+- **Profiled < latency-implied**: profiled bandwidth is lower than the latency-implied peak due to (1) caching effects and (2) launch/scheduling overhead included in the measurement window.
+
 ## Troubleshooting
 
 ### QProf Not Found
