@@ -4,7 +4,7 @@
 #include <functional>
 #include <memory>
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
  * @brief Backend category for device type identification
@@ -77,4 +77,4 @@ class Backend {
   virtual BackendCategory get_category() const = 0;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

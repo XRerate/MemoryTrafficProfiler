@@ -3,9 +3,9 @@
 #include <iostream>
 #include <thread>
 
-#include "MemoryFootprintProfiler.h"
+#include "MemoryTrafficProfiler.h"
 
-using namespace MemoryTrafficProfiler;
+using namespace memory_traffic_profiler;
 
 void printUsage(const char* program) {
   std::cout << "Usage: " << program << " [backend]" << std::endl;
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
             << std::endl;
 
   // Create profiler instance
-  MemoryFootprintProfiler p;
+  MemoryTrafficProfiler p;
 
   // Initialize profiler
   bool initialized = false;
@@ -78,22 +78,22 @@ int main(int argc, char* argv[]) {
   std::cout << "Profiling stopped." << std::endl;
   std::cout << std::endl;
 
-  // Get memory footprint
-  uint64_t read_footprint = p.GetReadMemoryFootprint();
-  uint64_t write_footprint = p.GetWriteMemoryFootprint();
-  uint64_t total_footprint = p.GetTotalMemoryFootprint();
+  // Get memory traffic
+  uint64_t read_traffic = p.GetReadMemoryTraffic();
+  uint64_t write_traffic = p.GetWriteMemoryTraffic();
+  uint64_t total_traffic = p.GetTotalMemoryTraffic();
 
-  std::cout << "=== Memory Footprint ===" << std::endl;
+  std::cout << "=== Memory Traffic ===" << std::endl;
   std::cout << std::fixed << std::setprecision(2);
-  std::cout << "Read Memory Footprint:  " << std::setw(15)
-            << read_footprint / (1024.0 * 1024.0) << " MB ("
-            << read_footprint << " bytes)" << std::endl;
-  std::cout << "Write Memory Footprint: " << std::setw(15)
-            << write_footprint / (1024.0 * 1024.0) << " MB ("
-            << write_footprint << " bytes)" << std::endl;
-  std::cout << "Total Memory Footprint: " << std::setw(15)
-            << total_footprint / (1024.0 * 1024.0) << " MB ("
-            << total_footprint << " bytes)" << std::endl;
+  std::cout << "Read Memory Traffic:  " << std::setw(15)
+            << read_traffic / (1024.0 * 1024.0) << " MB ("
+            << read_traffic << " bytes)" << std::endl;
+  std::cout << "Write Memory Traffic: " << std::setw(15)
+            << write_traffic / (1024.0 * 1024.0) << " MB ("
+            << write_traffic << " bytes)" << std::endl;
+  std::cout << "Total Memory Traffic: " << std::setw(15)
+            << total_traffic / (1024.0 * 1024.0) << " MB ("
+            << total_traffic << " bytes)" << std::endl;
 
   std::cout << std::endl;
   std::cout << "Example completed successfully!" << std::endl;

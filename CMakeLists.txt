@@ -98,7 +98,7 @@ endif()
 
 # Main library
 add_library(MemoryTrafficProfiler
-    src/MemoryFootprintProfiler.cpp
+    src/MemoryTrafficProfiler.cpp
     ${BACKEND_SOURCES}
 )
 
@@ -159,7 +159,7 @@ install(TARGETS MemoryTrafficProfiler
     INCLUDES DESTINATION include
 )
 
-install(FILES include/MemoryFootprintProfiler.h
+install(FILES include/MemoryTrafficProfiler.h
     DESTINATION include
 )
 

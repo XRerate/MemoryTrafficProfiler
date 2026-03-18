@@ -4,7 +4,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
  * @brief Adreno GPU backend using QProf API
@@ -27,4 +27,4 @@ class AdrenoBackend : public Backend {
   std::unique_ptr<Impl> pimpl_;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

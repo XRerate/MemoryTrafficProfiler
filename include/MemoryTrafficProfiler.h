@@ -8,26 +8,26 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
- * @brief Memory footprint profiler
+ * @brief Memory traffic profiler
  *
- * This class provides a unified interface for profiling GPU memory footprint
+ * This class provides a unified interface for profiling GPU memory traffic
  * (total bytes read/written) from external memory (DRAM) on both Qualcomm
  * Adreno and ARM Mali GPUs.
  */
-class MemoryFootprintProfiler {
+class MemoryTrafficProfiler {
  public:
   /**
    * @brief Constructor
    */
-  MemoryFootprintProfiler();
+  MemoryTrafficProfiler();
 
   /**
    * @brief Destructor
    */
-  ~MemoryFootprintProfiler();
+  ~MemoryTrafficProfiler();
 
   /**
    * @brief Initialize the profiler with available backend
@@ -46,34 +46,34 @@ class MemoryFootprintProfiler {
   bool Initialize(BackendCategory category);
 
   /**
-   * @brief Start memory footprint profiling
+   * @brief Start memory traffic profiling
    * @return true if start successful, false otherwise
    */
   bool Start();
 
   /**
-   * @brief Stop memory footprint profiling
+   * @brief Stop memory traffic profiling
    * @return true if stop successful, false otherwise
    */
   bool Stop();
 
   /**
-   * @brief Get the total read memory footprint in bytes
+   * @brief Get the total read memory traffic in bytes
    * @return Total bytes read during the profiling session
    */
-  uint64_t GetReadMemoryFootprint() const;
+  uint64_t GetReadMemoryTraffic() const;
 
   /**
-   * @brief Get the total write memory footprint in bytes
+   * @brief Get the total write memory traffic in bytes
    * @return Total bytes written during the profiling session
    */
-  uint64_t GetWriteMemoryFootprint() const;
+  uint64_t GetWriteMemoryTraffic() const;
 
   /**
-   * @brief Get the total memory footprint in bytes
+   * @brief Get the total memory traffic in bytes
    * @return Total bytes (read + write) during the profiling session
    */
-  uint64_t GetTotalMemoryFootprint() const;
+  uint64_t GetTotalMemoryTraffic() const;
 
   /**
    * @brief Check if profiling is currently active
@@ -88,8 +88,8 @@ class MemoryFootprintProfiler {
   const char* GetBackendName() const;
 
   // Delete copy constructor and assignment operator
-  MemoryFootprintProfiler(const MemoryFootprintProfiler&) = delete;
-  MemoryFootprintProfiler& operator=(const MemoryFootprintProfiler&) = delete;
+  MemoryTrafficProfiler(const MemoryTrafficProfiler&) = delete;
+  MemoryTrafficProfiler& operator=(const MemoryTrafficProfiler&) = delete;
 
  private:
   /**
@@ -114,7 +114,7 @@ class MemoryFootprintProfiler {
   bool initialize(std::unique_ptr<Backend> backend);
 
   /**
-   * @brief Sampling thread function to accumulate memory footprint
+   * @brief Sampling thread function to accumulate memory traffic
    */
   void samplingThread();
 
@@ -128,4 +128,4 @@ class MemoryFootprintProfiler {
   mutable std::mutex mutex_;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

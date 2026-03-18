@@ -4,7 +4,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
  * @brief Mali GPU backend using libGPUCounters
@@ -27,4 +27,4 @@ class MaliBackend : public Backend {
   std::unique_ptr<Impl> pimpl_;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

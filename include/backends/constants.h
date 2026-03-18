@@ -1,6 +1,6 @@
 #pragma once
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 // Time conversion constants (shared across backends)
 namespace TimeConversion {
@@ -14,4 +14,4 @@ namespace BandwidthConversion {
 constexpr double BYTES_TO_MB = 1024.0 * 1024.0;
 }  // namespace BandwidthConversion
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

@@ -10,7 +10,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 // NPU AXI metric IDs (values are reported in MB/s by QProf)
 namespace NpuMetrics {
@@ -387,4 +387,4 @@ BackendCategory NpuBackend::get_category() const {
   return BackendCategory::NPU;
 }
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

@@ -99,8 +99,8 @@ cc_library(
 # Main MemoryTrafficProfiler library
 cc_library(
     name = "memory_traffic_profiler",
-    srcs = ["src/MemoryFootprintProfiler.cpp"],
-    hdrs = ["include/MemoryFootprintProfiler.h"],
+    srcs = ["src/MemoryTrafficProfiler.cpp"],
+    hdrs = ["include/MemoryTrafficProfiler.h"],
     deps = [
         ":backend_interface",
     ] + select({

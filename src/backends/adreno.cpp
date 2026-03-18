@@ -10,7 +10,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 // QProf metric IDs
 namespace QProfMetrics {
@@ -336,4 +336,4 @@ BackendCategory AdrenoBackend::get_category() const {
   return BackendCategory::GPU;
 }
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

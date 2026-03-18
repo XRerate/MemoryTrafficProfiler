@@ -4,7 +4,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
  * @brief NPU backend using QProf API with AXI bandwidth metrics
@@ -34,4 +34,4 @@ class NpuBackend : public Backend {
   std::unique_ptr<Impl> pimpl_;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

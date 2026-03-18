@@ -1,4 +1,4 @@
-#include "MemoryFootprintProfiler.h"
+#include "MemoryTrafficProfiler.h"
 #ifdef BUILD_MALI_BACKEND
 #include "backends/mali.h"
 #endif
@@ -13,15 +13,15 @@
 #endif
 #include <chrono>
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
-// Constants for memory footprint calculation
+// Constants for memory traffic calculation
 namespace {
 constexpr double BYTES_PER_MB = 1024.0 * 1024.0;
 constexpr uint32_t DEFAULT_SAMPLING_INTERVAL_MS = 10;  // 10ms for accurate accumulation
 }  // namespace
 
-MemoryFootprintProfiler::MemoryFootprintProfiler()
+MemoryTrafficProfiler::MemoryTrafficProfiler()
     : should_sample_(false),
       is_profiling_(false),
       accumulated_read_bytes_(0),
@@ -30,9 +30,9 @@ MemoryFootprintProfiler::MemoryFootprintProfiler()
   // Don't auto-initialize - user must call Initialize()
 }
 
-MemoryFootprintProfiler::~MemoryFootprintProfiler() { Stop(); }
+MemoryTrafficProfiler::~MemoryTrafficProfiler() { Stop(); }
 
-bool MemoryFootprintProfiler::Initialize() {
+bool MemoryTrafficProfiler::Initialize() {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (is_profiling_) {
@@ -46,7 +46,7 @@ bool MemoryFootprintProfiler::Initialize() {
   return autoInitialize();
 }
 
-bool MemoryFootprintProfiler::Initialize(BackendCategory category) {
+bool MemoryTrafficProfiler::Initialize(BackendCategory category) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (is_profiling_) {
@@ -60,7 +60,7 @@ bool MemoryFootprintProfiler::Initialize(BackendCategory category) {
   return initializeByCategory(category);
 }
 
-bool MemoryFootprintProfiler::autoInitialize() {
+bool MemoryTrafficProfiler::autoInitialize() {
   // Try to initialize with available backends
   // Try Mali first, then Adreno, then CPU, then NPU
 
@@ -95,7 +95,7 @@ bool MemoryFootprintProfiler::autoInitialize() {
   return false;
 }
 
-bool MemoryFootprintProfiler::initializeByCategory(BackendCategory category) {
+bool MemoryTrafficProfiler::initializeByCategory(BackendCategory category) {
   switch (category) {
     case BackendCategory::GPU:
 #ifdef BUILD_MALI_BACKEND
@@ -119,7 +119,7 @@ bool MemoryFootprintProfiler::initializeByCategory(BackendCategory category) {
   return false;
 }
 
-bool MemoryFootprintProfiler::initialize(std::unique_ptr<Backend> backend) {
+bool MemoryTrafficProfiler::initialize(std::unique_ptr<Backend> backend) {
   if (!backend) {
     return false;
   }
@@ -132,7 +132,7 @@ bool MemoryFootprintProfiler::initialize(std::unique_ptr<Backend> backend) {
   return true;
 }
 
-bool MemoryFootprintProfiler::Start() {
+bool MemoryTrafficProfiler::Start() {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (!backend_) {
@@ -159,13 +159,13 @@ bool MemoryFootprintProfiler::Start() {
   should_sample_ = true;
   is_profiling_ = true;
 
-  // Start sampling thread to accumulate memory footprint
-  sampling_thread_ = std::thread(&MemoryFootprintProfiler::samplingThread, this);
+  // Start sampling thread to accumulate memory traffic
+  sampling_thread_ = std::thread(&MemoryTrafficProfiler::samplingThread, this);
 
   return true;
 }
 
-bool MemoryFootprintProfiler::Stop() {
+bool MemoryTrafficProfiler::Stop() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -190,21 +190,21 @@ bool MemoryFootprintProfiler::Stop() {
   return true;
 }
 
-uint64_t MemoryFootprintProfiler::GetReadMemoryFootprint() const {
+uint64_t MemoryTrafficProfiler::GetReadMemoryTraffic() const {
   return accumulated_read_bytes_.load();
 }
 
-uint64_t MemoryFootprintProfiler::GetWriteMemoryFootprint() const {
+uint64_t MemoryTrafficProfiler::GetWriteMemoryTraffic() const {
   return accumulated_write_bytes_.load();
 }
 
-uint64_t MemoryFootprintProfiler::GetTotalMemoryFootprint() const {
+uint64_t MemoryTrafficProfiler::GetTotalMemoryTraffic() const {
   return accumulated_read_bytes_.load() + accumulated_write_bytes_.load();
 }
 
-bool MemoryFootprintProfiler::IsProfiling() const { return is_profiling_.load(); }
+bool MemoryTrafficProfiler::IsProfiling() const { return is_profiling_.load(); }
 
-const char* MemoryFootprintProfiler::GetBackendName() const {
+const char* MemoryTrafficProfiler::GetBackendName() const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (backend_) {
     return backend_->get_name();
@@ -212,7 +212,7 @@ const char* MemoryFootprintProfiler::GetBackendName() const {
   return nullptr;
 }
 
-void MemoryFootprintProfiler::samplingThread() {
+void MemoryTrafficProfiler::samplingThread() {
   BandwidthData data;
   uint64_t last_timestamp_ns = 0;
 
@@ -243,7 +243,7 @@ void MemoryFootprintProfiler::samplingThread() {
           double delta_seconds = static_cast<double>(delta_ns) / 1e9;
 
           if (delta_seconds > 0.0) {
-            // Accumulate memory footprint: bandwidth (MB/s) * time (s) * bytes/MB
+            // Accumulate memory traffic: bandwidth (MB/s) * time (s) * bytes/MB
             // = bytes
             uint64_t read_bytes_delta = static_cast<uint64_t>(
                 data.read_bandwidth_mbps * delta_seconds * BYTES_PER_MB);
@@ -265,4 +265,4 @@ void MemoryFootprintProfiler::samplingThread() {
   }
 }
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

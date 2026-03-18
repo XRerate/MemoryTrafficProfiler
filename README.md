@@ -11,7 +11,7 @@ A cross-platform memory traffic profiler for Android devices. Measures total byt
   - Qualcomm NPU/HTP (using QProf AXI bandwidth metrics)
 - **Auto-Detection**: Automatically detects and initializes the appropriate backend (tries Mali → Adreno → CPU → NPU)
 - **Backend Selection**: Optionally specify a backend category (GPU, CPU, NPU)
-- **Memory Footprint Accumulation**: Tracks cumulative read/write bytes via background sampling thread
+- **Memory Traffic Accumulation**: Tracks cumulative read/write bytes via background sampling thread
 - **Cross-Platform**: Supports Android devices via NDK cross-compilation
 - **Dual Build System**: Both CMake and Bazel supported
 
@@ -164,11 +164,11 @@ adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp ./memory_traffi
 ### Basic Example (Auto-Detection)
 
 ```cpp
-#include "MemoryFootprintProfiler.h"
+#include "MemoryTrafficProfiler.h"
 
 int main() {
     // Create profiler instance
-    MemoryTrafficProfiler::MemoryFootprintProfiler p;
+    MemoryTrafficProfiler::MemoryTrafficProfiler p;
 
     // Initialize (auto-detects backend: tries Mali → Adreno → CPU → NPU)
     if (!p.Initialize()) {
@@ -187,10 +187,10 @@ int main() {
     // Stop profiling
     p.Stop();
 
-    // Get accumulated memory footprint
-    uint64_t read_bytes = p.GetReadMemoryFootprint();
-    uint64_t write_bytes = p.GetWriteMemoryFootprint();
-    uint64_t total_bytes = p.GetTotalMemoryFootprint();
+    // Get accumulated memory traffic
+    uint64_t read_bytes = p.GetReadMemoryTraffic();
+    uint64_t write_bytes = p.GetWriteMemoryTraffic();
+    uint64_t total_bytes = p.GetTotalMemoryTraffic();
 
     std::cout << "Read:  " << read_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
     std::cout << "Write: " << write_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
@@ -203,12 +203,12 @@ int main() {
 ### Backend Selection Example
 
 ```cpp
-#include "MemoryFootprintProfiler.h"
+#include "MemoryTrafficProfiler.h"
 
-using namespace MemoryTrafficProfiler;
+using namespace memory_traffic_profiler;
 
 int main() {
-    MemoryFootprintProfiler p;
+    MemoryTrafficProfiler p;
 
     // Initialize with a specific backend category
     if (!p.Initialize(BackendCategory::CPU)) {
@@ -226,11 +226,11 @@ int main() {
 |--------|-------------|
 | `Initialize()` | Auto-detect and initialize the appropriate backend (Mali → Adreno → CPU → NPU) |
 | `Initialize(BackendCategory)` | Initialize with a specific backend category (`GPU`, `CPU`, `NPU`) |
-| `Start()` | Start memory footprint profiling (background sampling thread) |
+| `Start()` | Start memory traffic profiling (background sampling thread) |
 | `Stop()` | Stop profiling |
-| `GetReadMemoryFootprint()` | Get total bytes read from DRAM |
-| `GetWriteMemoryFootprint()` | Get total bytes written to DRAM |
-| `GetTotalMemoryFootprint()` | Get total bytes (read + write) |
+| `GetReadMemoryTraffic()` | Get total bytes read from DRAM |
+| `GetWriteMemoryTraffic()` | Get total bytes written to DRAM |
+| `GetTotalMemoryTraffic()` | Get total bytes (read + write) |
 | `IsProfiling()` | Check if profiling is currently active |
 | `GetBackendName()` | Get the name of the active backend |
 
@@ -339,7 +339,7 @@ Workload: QNN-compiled matvec, 200 layers.
 ```
 MemoryTrafficProfiler/
 ├── include/
-│   ├── MemoryFootprintProfiler.h      # Main profiler interface
+│   ├── MemoryTrafficProfiler.h      # Main profiler interface
 │   └── backends/
 │       ├── backend.h                   # Abstract backend interface
 │       ├── constants.h                 # Unit conversion constants
@@ -348,7 +348,7 @@ MemoryTrafficProfiler/
 │       ├── cpu.h                       # CPU backend header
 │       └── npu.h                       # NPU backend header
 ├── src/
-│   ├── MemoryFootprintProfiler.cpp     # Main profiler implementation
+│   ├── MemoryTrafficProfiler.cpp     # Main profiler implementation
 │   └── backends/
 │       ├── adreno.cpp                  # Adreno GPU backend (QProf)
 │       ├── mali.cpp                    # Mali GPU backend (libGPUCounters)

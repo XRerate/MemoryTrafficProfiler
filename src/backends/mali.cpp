@@ -11,7 +11,7 @@
 #include "backends/backend.h"
 #include "backends/constants.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 class MaliBackend::Impl {
  public:
@@ -221,4 +221,4 @@ const char* MaliBackend::get_name() const { return "Mali"; }
 
 BackendCategory MaliBackend::get_category() const { return BackendCategory::GPU; }
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

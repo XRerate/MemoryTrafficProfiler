@@ -14,7 +14,7 @@
 
 #include "backends/constants.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 // ARMv8 PMU constants
 namespace PmuConfig {
@@ -235,4 +235,4 @@ BackendCategory CpuBackend::get_category() const {
   return BackendCategory::CPU;
 }
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler

@@ -4,7 +4,7 @@
 
 #include "backends/backend.h"
 
-namespace MemoryTrafficProfiler {
+namespace memory_traffic_profiler {
 
 /**
  * @brief CPU backend using perf_event_open bus_access PMU counter
@@ -31,4 +31,4 @@ class CpuBackend : public Backend {
   std::unique_ptr<Impl> pimpl_;
 };
 
-}  // namespace MemoryTrafficProfiler
+}  // namespace memory_traffic_profiler
