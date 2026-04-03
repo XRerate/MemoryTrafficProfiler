@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include "backends/backend.h"
 
@@ -30,11 +31,10 @@ class MemoryTrafficProfiler {
   ~MemoryTrafficProfiler();
 
   /**
-   * @brief Initialize the profiler with available backend
-   * @return true if initialization successful, false otherwise
-   * @note This function automatically detects and initializes the appropriate
-   * backend (tries Mali first, then Adreno). If no backend is available,
-   * Initialize() will return false.
+   * @brief Initialize the profiler with all available backends
+   * @return true if at least one backend initialized successfully
+   * @note Tries one GPU vendor (Mali, then Adreno), then CPU, then NPU,
+   * adding each that succeeds so traffic is aggregated across devices.
    */
   bool Initialize();
 
@@ -44,6 +44,14 @@ class MemoryTrafficProfiler {
    * @return true if initialization successful, false otherwise
    */
   bool Initialize(BackendCategory category);
+
+  /**
+   * @brief Initialize with multiple backend categories (one instance per
+   * category; duplicate categories are ignored)
+   * @param categories Empty list behaves like Initialize()
+   * @return true if at least one backend initialized successfully
+   */
+  bool Initialize(const std::vector<BackendCategory>& categories);
 
   /**
    * @brief Start memory traffic profiling
@@ -58,22 +66,31 @@ class MemoryTrafficProfiler {
   bool Stop();
 
   /**
-   * @brief Get the total read memory traffic in bytes
-   * @return Total bytes read during the profiling session
+   * @brief Read traffic for all backends with this category
+   * @note If multiple backends share the category, their counters are summed
    */
-  uint64_t GetReadMemoryTraffic() const;
+  uint64_t GetReadMemoryTraffic(BackendCategory category) const;
 
   /**
-   * @brief Get the total write memory traffic in bytes
-   * @return Total bytes written during the profiling session
+   * @brief Write traffic for all backends with this category
    */
-  uint64_t GetWriteMemoryTraffic() const;
+  uint64_t GetWriteMemoryTraffic(BackendCategory category) const;
 
   /**
-   * @brief Get the total memory traffic in bytes
-   * @return Total bytes (read + write) during the profiling session
+   * @brief Read + write for all backends with this category
    */
-  uint64_t GetTotalMemoryTraffic() const;
+  uint64_t GetTotalMemoryTraffic(BackendCategory category) const;
+
+  /**
+   * @return Whether a backend for this category was successfully initialized
+   */
+  bool HasBackendCategory(BackendCategory category) const;
+
+  /**
+   * @brief Category of the backend at this index (for pairing with GetBackendName)
+   * @pre index < GetBackendCount()
+   */
+  BackendCategory GetBackendCategory(size_t index) const;
 
   /**
    * @brief Check if profiling is currently active
@@ -82,10 +99,15 @@ class MemoryTrafficProfiler {
   bool IsProfiling() const;
 
   /**
-   * @brief Get the current backend name
-   * @return Name of the current backend, or nullptr if not initialized
+   * @brief Number of active backends
    */
-  const char* GetBackendName() const;
+  size_t GetBackendCount() const;
+
+  /**
+   * @param index Backend index (0 .. GetBackendCount()-1)
+   * @return Backend name, or nullptr if not initialized / index out of range
+   */
+  const char* GetBackendName(size_t index = 0) const;
 
   // Delete copy constructor and assignment operator
   MemoryTrafficProfiler(const MemoryTrafficProfiler&) = delete;
@@ -113,17 +135,20 @@ class MemoryTrafficProfiler {
    */
   bool initialize(std::unique_ptr<Backend> backend);
 
+  /** @pre mutex_ is held by caller */
+  bool hasBackendCategoryUnlocked(BackendCategory category) const;
+
   /**
    * @brief Sampling thread function to accumulate memory traffic
    */
   void samplingThread();
 
-  std::unique_ptr<Backend> backend_;
+  std::vector<std::unique_ptr<Backend>> backends_;
+  std::vector<uint64_t> per_backend_read_bytes_;
+  std::vector<uint64_t> per_backend_write_bytes_;
   std::thread sampling_thread_;
   std::atomic<bool> should_sample_;
   std::atomic<bool> is_profiling_;
-  std::atomic<uint64_t> accumulated_read_bytes_;
-  std::atomic<uint64_t> accumulated_write_bytes_;
   uint32_t sampling_interval_ms_;
   mutable std::mutex mutex_;
 };

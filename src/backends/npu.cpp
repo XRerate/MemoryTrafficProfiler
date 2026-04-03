@@ -1,18 +1,24 @@
 #include "backends/npu.h"
 
+#include "backends/qprof_session.h"
+
 #include <QProfilerApi.h>
 #include <QProfilerCommon.h>
 
 #include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <mutex>
 
 #include "backends/backend.h"
 
 namespace memory_traffic_profiler {
 
-// NPU AXI metric IDs (values are reported in MB/s by QProf)
+namespace NpuQProfConfig {
+constexpr const char* CAPABILITY_NAME = "profiler:nsp-dsp-metrics";
+constexpr uint32_t STREAMING_RATE_MS = 200;
+constexpr uint32_t SAMPLING_RATE_MS = 1;
+}  // namespace NpuQProfConfig
+
 namespace NpuMetrics {
 constexpr uint16_t AXI_128B_READ_REQUEST = 4141;
 constexpr uint16_t AXI_128B_WRITE_REQUEST = 4142;
@@ -21,127 +27,15 @@ constexpr uint16_t AXI_256B_READ_REQUEST = 4144;
 constexpr uint16_t NUM_METRICS = 4;
 }  // namespace NpuMetrics
 
-// QProf configuration constants for NPU AXI metrics (nsp-dsp-metrics capability)
-namespace NpuQProfConfig {
-constexpr const char* CAPABILITY_NAME = "profiler:nsp-dsp-metrics";
-constexpr uint32_t STREAMING_RATE_MS = 200;
-// nsp-dsp-metrics supports 1ms and 10ms sampling rates
-constexpr uint32_t SAMPLING_RATE_MS = 1;
-}  // namespace NpuQProfConfig
-
-// Global callback data: accumulate-consume pattern with fallback
-static struct {
-  std::mutex mutex;
-  // Per-metric accumulators (written by callback, consumed by sample)
-  double axi_128b_read_sum;
-  uint32_t axi_128b_read_count;
-  double axi_128b_write_sum;
-  uint32_t axi_128b_write_count;
-  double axi_256b_write_sum;
-  uint32_t axi_256b_write_count;
-  double axi_256b_read_sum;
-  uint32_t axi_256b_read_count;
-  // Fallback (written by sample, read by sample when no new data)
-  double last_avg_read_mbps;
-  double last_avg_write_mbps;
-  bool has_ever_received_data;
-} g_npu_callback_data;
-
-// Result callback to receive NPU profiling data
-void NpuResultCallback(LpProfilingResult profilingResult) {
-  std::lock_guard<std::mutex> lock(g_npu_callback_data.mutex);
-
-  if (profilingResult == nullptr) {
-    return;
-  }
-
-  if (RESULT_TYPE_GENERIC_STRUCT == profilingResult->resultType) {
-    if (profilingResult->profilingResultGeneric != nullptr &&
-        profilingResult->profilingResultGeneric->metricResponse != nullptr) {
-      for (uint16_t index = 0;
-           index < profilingResult->profilingResultGeneric->metricResponseLen;
-           index++) {
-        uint16_t metric_id =
-            profilingResult->profilingResultGeneric->metricResponse[index]
-                .metricId;
-        eDataType data_type =
-            profilingResult->profilingResultGeneric->metricResponse[index]
-                .value.dataType;
-        uint64_t timestamp =
-            profilingResult->profilingResultGeneric->metricResponse[index]
-                .timestamp;
-
-        double value = 0.0;
-        switch (data_type) {
-          case DATA_TYPE_UINT64:
-            value = static_cast<double>(
-                profilingResult->profilingResultGeneric->metricResponse[index]
-                    .value.uint64Value);
-            break;
-          case DATA_TYPE_DOUBLE:
-            value =
-                profilingResult->profilingResultGeneric->metricResponse[index]
-                    .value.doubleValue;
-            break;
-          default:
-            continue;
-        }
-
-        switch (metric_id) {
-          case NpuMetrics::AXI_128B_READ_REQUEST:
-            g_npu_callback_data.axi_128b_read_sum += value;
-            g_npu_callback_data.axi_128b_read_count++;
-            break;
-          case NpuMetrics::AXI_128B_WRITE_REQUEST:
-            g_npu_callback_data.axi_128b_write_sum += value;
-            g_npu_callback_data.axi_128b_write_count++;
-            break;
-          case NpuMetrics::AXI_256B_WRITE_REQUEST:
-            g_npu_callback_data.axi_256b_write_sum += value;
-            g_npu_callback_data.axi_256b_write_count++;
-            break;
-          case NpuMetrics::AXI_256B_READ_REQUEST:
-            g_npu_callback_data.axi_256b_read_sum += value;
-            g_npu_callback_data.axi_256b_read_count++;
-            break;
-          default:
-            continue;
-        }
-
-        g_npu_callback_data.has_ever_received_data = true;
-      }
-    }
-  }
-
-  qp_freeProfilingResult(profilingResult);
-}
-
-// Message callback for errors/warnings
-void NpuMessageCallback(LpProfilingMessage message) {
-  if (message != nullptr) {
-    fprintf(stderr, "QProf NPU Message: %s\n", message->message);
-  }
-}
-
 class NpuBackend::Impl {
  public:
   Impl()
-      : context_request_(nullptr),
-        start_config_(nullptr),
+      : start_config_(nullptr),
         stop_config_(nullptr),
         is_profiling_(false),
-        last_timestamp_ns_(0) {
-    g_npu_callback_data.axi_128b_read_sum = 0.0;
-    g_npu_callback_data.axi_128b_read_count = 0;
-    g_npu_callback_data.axi_128b_write_sum = 0.0;
-    g_npu_callback_data.axi_128b_write_count = 0;
-    g_npu_callback_data.axi_256b_write_sum = 0.0;
-    g_npu_callback_data.axi_256b_write_count = 0;
-    g_npu_callback_data.axi_256b_read_sum = 0.0;
-    g_npu_callback_data.axi_256b_read_count = 0;
-    g_npu_callback_data.last_avg_read_mbps = 0.0;
-    g_npu_callback_data.last_avg_write_mbps = 0.0;
-    g_npu_callback_data.has_ever_received_data = false;
+        last_timestamp_ns_(0),
+        session_registered_(false) {
+    QProfNpuResetCallbackState();
   }
 
   ~Impl() {
@@ -154,66 +48,45 @@ class NpuBackend::Impl {
     if (stop_config_) {
       delete stop_config_;
     }
-    if (context_request_) {
-      qp_destroy(context_request_);
-      delete context_request_;
+    if (session_registered_) {
+      QProfSession::unregisterUser();
     }
   }
 
   bool initialize() {
-    if (context_request_) {
+    if (session_registered_) {
       return true;
     }
 
-    context_request_ = new ContextRequest();
-    if (!context_request_) {
+    if (!QProfSession::registerUser()) {
       return false;
     }
+    session_registered_ = true;
 
-    eReturnCode ret = qp_initialize(context_request_, nullptr);
-    if (ret != RETURN_CODE_SUCCESS) {
-      fprintf(stderr, "QProf NPU initialization failed with error code: %d\n",
-              static_cast<int>(ret));
-      delete context_request_;
-      context_request_ = nullptr;
-      return false;
-    }
-
-    qp_setResultCallback(context_request_, NpuResultCallback);
-    qp_setMessageCallback(context_request_, NpuMessageCallback);
-
-    // Validate that the nsp-dsp-metrics capability is available
     if (!validateCapability()) {
       fprintf(stderr,
               "QProf NPU: capability '%s' not found on this device\n",
               NpuQProfConfig::CAPABILITY_NAME);
-      qp_destroy(context_request_);
-      delete context_request_;
-      context_request_ = nullptr;
+      QProfSession::unregisterUser();
+      session_registered_ = false;
       return false;
     }
 
-    // Configure start configuration with NPU AXI metrics
     start_config_ = new ProfilingEventStartConfiguration();
     start_config_->capabilityName.capabilityNameLen =
         snprintf((char*)start_config_->capabilityName.capabilityName,
                  CAPABILITY_NAME_LENGTH, "%s", NpuQProfConfig::CAPABILITY_NAME);
     start_config_->metricIds.metricIdsLen = NpuMetrics::NUM_METRICS;
-    start_config_->metricIds.metricIds[0] =
-        NpuMetrics::AXI_128B_READ_REQUEST;
-    start_config_->metricIds.metricIds[1] =
-        NpuMetrics::AXI_128B_WRITE_REQUEST;
-    start_config_->metricIds.metricIds[2] =
-        NpuMetrics::AXI_256B_WRITE_REQUEST;
-    start_config_->metricIds.metricIds[3] =
-        NpuMetrics::AXI_256B_READ_REQUEST;
+    start_config_->metricIds.metricIds[0] = NpuMetrics::AXI_128B_READ_REQUEST;
+    start_config_->metricIds.metricIds[1] = NpuMetrics::AXI_128B_WRITE_REQUEST;
+    start_config_->metricIds.metricIds[2] = NpuMetrics::AXI_256B_WRITE_REQUEST;
+    start_config_->metricIds.metricIds[3] = NpuMetrics::AXI_256B_READ_REQUEST;
     start_config_->streamingRate = NpuQProfConfig::STREAMING_RATE_MS;
     start_config_->samplingRate = NpuQProfConfig::SAMPLING_RATE_MS;
     start_config_->profilerConfig = nullptr;
     start_config_->profilerConfigLen = 0;
     start_config_->resultType = RESULT_TYPE_GENERIC_STRUCT;
 
-    // Configure stop configuration
     stop_config_ = new ProfilingEventStopConfiguration();
     stop_config_->capabilityName.capabilityNameLen =
         snprintf((char*)stop_config_->capabilityName.capabilityName,
@@ -224,7 +97,8 @@ class NpuBackend::Impl {
   }
 
   bool start() {
-    if (!context_request_ || !start_config_) {
+    LpContextRequest ctx = QProfSession::context();
+    if (!ctx || !start_config_) {
       return false;
     }
 
@@ -232,7 +106,7 @@ class NpuBackend::Impl {
       return true;
     }
 
-    eReturnCode ret = qp_start(context_request_, start_config_);
+    eReturnCode ret = qp_start(ctx, start_config_);
     if (ret != RETURN_CODE_SUCCESS) {
       return false;
     }
@@ -244,11 +118,12 @@ class NpuBackend::Impl {
   }
 
   bool stop() {
-    if (!context_request_ || !stop_config_ || !is_profiling_) {
+    LpContextRequest ctx = QProfSession::context();
+    if (!ctx || !stop_config_ || !is_profiling_) {
       return false;
     }
 
-    eReturnCode ret = qp_stop(context_request_, stop_config_);
+    eReturnCode ret = qp_stop(ctx, stop_config_);
     if (ret != RETURN_CODE_SUCCESS) {
       return false;
     }
@@ -258,87 +133,22 @@ class NpuBackend::Impl {
   }
 
   bool sample(BandwidthData& data) {
-    if (!context_request_ || !is_profiling_) {
+    if (!is_profiling_) {
       return false;
     }
-
-    double read_mbps = 0.0;
-    double write_mbps = 0.0;
-
-    {
-      std::lock_guard<std::mutex> lock(g_npu_callback_data.mutex);
-
-      if (!g_npu_callback_data.has_ever_received_data) {
-        return false;  // No data has ever arrived from QProf yet
-      }
-
-      bool has_new_data = (g_npu_callback_data.axi_128b_read_count > 0 ||
-                           g_npu_callback_data.axi_128b_write_count > 0 ||
-                           g_npu_callback_data.axi_256b_read_count > 0 ||
-                           g_npu_callback_data.axi_256b_write_count > 0);
-
-      if (has_new_data) {
-        // Compute per-metric averages
-        double avg_128b_read = g_npu_callback_data.axi_128b_read_count > 0
-            ? g_npu_callback_data.axi_128b_read_sum / g_npu_callback_data.axi_128b_read_count
-            : 0.0;
-        double avg_128b_write = g_npu_callback_data.axi_128b_write_count > 0
-            ? g_npu_callback_data.axi_128b_write_sum / g_npu_callback_data.axi_128b_write_count
-            : 0.0;
-        double avg_256b_read = g_npu_callback_data.axi_256b_read_count > 0
-            ? g_npu_callback_data.axi_256b_read_sum / g_npu_callback_data.axi_256b_read_count
-            : 0.0;
-        double avg_256b_write = g_npu_callback_data.axi_256b_write_count > 0
-            ? g_npu_callback_data.axi_256b_write_sum / g_npu_callback_data.axi_256b_write_count
-            : 0.0;
-
-        read_mbps = avg_128b_read + avg_256b_read;
-        write_mbps = avg_128b_write + avg_256b_write;
-
-#ifndef NDEBUG
-        fprintf(stderr, "[NPU] avg_rd=%.2f  avg_wr=%.2f MB/s  samples=%u  delta_ms=%.1f\n",
-                read_mbps, write_mbps, g_npu_callback_data.axi_128b_read_count,
-                static_cast<double>(get_timestamp_ns() - last_timestamp_ns_) / 1e6);
-#endif
-
-        // Reset all accumulators
-        g_npu_callback_data.axi_128b_read_sum = 0.0;
-        g_npu_callback_data.axi_128b_read_count = 0;
-        g_npu_callback_data.axi_128b_write_sum = 0.0;
-        g_npu_callback_data.axi_128b_write_count = 0;
-        g_npu_callback_data.axi_256b_read_sum = 0.0;
-        g_npu_callback_data.axi_256b_read_count = 0;
-        g_npu_callback_data.axi_256b_write_sum = 0.0;
-        g_npu_callback_data.axi_256b_write_count = 0;
-
-        // Store as fallback
-        g_npu_callback_data.last_avg_read_mbps = read_mbps;
-        g_npu_callback_data.last_avg_write_mbps = write_mbps;
-      } else {
-        // No new data since last consume: use fallback
-        read_mbps = g_npu_callback_data.last_avg_read_mbps;
-        write_mbps = g_npu_callback_data.last_avg_write_mbps;
-      }
-    }
-
-    uint64_t current_time_ns = get_timestamp_ns();
-
-    data.read_bandwidth_mbps = read_mbps;
-    data.write_bandwidth_mbps = write_mbps;
-    data.total_bandwidth_mbps = read_mbps + write_mbps;
-    data.timestamp_ns = current_time_ns;
-
-    last_timestamp_ns_ = current_time_ns;
-
-    return true;
+    return QProfNpuConsumeSample(data, &last_timestamp_ns_);
   }
 
   bool is_profiling() const { return is_profiling_; }
 
  private:
   bool validateCapability() {
+    LpContextRequest ctx = QProfSession::context();
+    if (!ctx) {
+      return false;
+    }
     CapabilitiesResponse response = {};
-    eReturnCode ret = qp_getCapabilities(context_request_, &response);
+    eReturnCode ret = qp_getCapabilities(ctx, &response);
     if (ret != RETURN_CODE_SUCCESS) {
       return false;
     }
@@ -360,11 +170,11 @@ class NpuBackend::Impl {
         .count();
   }
 
-  LpContextRequest context_request_;
   LpProfilingEventStartConfiguration start_config_;
   LpProfilingEventStopConfiguration stop_config_;
   bool is_profiling_;
   uint64_t last_timestamp_ns_;
+  bool session_registered_;
 };
 
 NpuBackend::NpuBackend() : pimpl_(std::make_unique<Impl>()) {}

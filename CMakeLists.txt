@@ -75,6 +75,13 @@ if(BUILD_MALI_BACKEND)
     )
 endif()
 
+if(BUILD_ADRENO_BACKEND OR BUILD_NPU_BACKEND)
+    list(APPEND BACKEND_SOURCES
+        include/backends/qprof_session.h
+        src/backends/qprof_session.cpp
+    )
+endif()
+
 if(BUILD_ADRENO_BACKEND)
     list(APPEND BACKEND_SOURCES
         include/backends/adreno.h
@@ -170,6 +177,12 @@ install(FILES include/backends/backend.h
 
 if(BUILD_MALI_BACKEND)
     install(FILES include/backends/mali.h
+        DESTINATION include/backends
+    )
+endif()
+
+if(BUILD_ADRENO_BACKEND OR BUILD_NPU_BACKEND)
+    install(FILES include/backends/qprof_session.h
         DESTINATION include/backends
     )
 endif()

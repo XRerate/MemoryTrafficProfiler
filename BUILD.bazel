@@ -55,6 +55,23 @@ cc_library(
     copts = ["-std=c++14"],
 )
 
+# Shared QProf session (single qp_initialize for Adreno + NPU)
+cc_library(
+    name = "qprof_session",
+    srcs = ["src/backends/qprof_session.cpp"],
+    hdrs = ["include/backends/qprof_session.h"],
+    deps = [
+        ":backend_interface",
+        "@qprof//:qprof",
+    ],
+    defines = [
+        "BUILD_ADRENO_BACKEND",
+        "BUILD_NPU_BACKEND",
+    ],
+    includes = ["include"],
+    copts = ["-std=c++14"],
+)
+
 # Adreno backend
 cc_library(
     name = "adreno_backend",
@@ -62,6 +79,7 @@ cc_library(
     hdrs = ["include/backends/adreno.h"],
     deps = [
         ":backend_interface",
+        ":qprof_session",
         "@qprof//:qprof",
     ],
     defines = ["BUILD_ADRENO_BACKEND"],
@@ -89,6 +107,7 @@ cc_library(
     hdrs = ["include/backends/npu.h"],
     deps = [
         ":backend_interface",
+        ":qprof_session",
         "@qprof//:qprof",
     ],
     defines = ["BUILD_NPU_BACKEND"],

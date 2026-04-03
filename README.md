@@ -29,6 +29,8 @@ A cross-platform memory traffic profiler for Android devices. Measures total byt
 
 Both the Adreno GPU and NPU backends require the Qualcomm Profiler (QProf) API.
 
+The library uses **one shared QProf session** for the process: `qp_initialize` runs once, and each backend calls `qp_start` / `qp_stop` with its own capability (GPU DDR vs NPU AXI metrics). A single result callback dispatches samples by metric ID.
+
 #### Environment Variables
 
 1. **`QPROF_HOME`** (Optional, defaults to `/opt/qcom/Shared/QualcommProfiler/API`)
@@ -166,11 +168,13 @@ adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp ./memory_traffi
 ```cpp
 #include "MemoryTrafficProfiler.h"
 
+using namespace memory_traffic_profiler;
+
 int main() {
     // Create profiler instance
-    MemoryTrafficProfiler::MemoryTrafficProfiler p;
+    MemoryTrafficProfiler p;
 
-    // Initialize (auto-detects backend: tries Mali → Adreno → CPU → NPU)
+    // Initialize (auto: one GPU vendor if available, plus CPU and NPU)
     if (!p.Initialize()) {
         std::cerr << "Failed to initialize profiler" << std::endl;
         return 1;
@@ -188,9 +192,9 @@ int main() {
     p.Stop();
 
     // Get accumulated memory traffic
-    uint64_t read_bytes = p.GetReadMemoryTraffic();
-    uint64_t write_bytes = p.GetWriteMemoryTraffic();
-    uint64_t total_bytes = p.GetTotalMemoryTraffic();
+    uint64_t read_bytes = p.GetReadMemoryTraffic(BackendCategory::CPU);
+    uint64_t write_bytes = p.GetWriteMemoryTraffic(BackendCategory::CPU);
+    uint64_t total_bytes = p.GetTotalMemoryTraffic(BackendCategory::CPU);
 
     std::cout << "Read:  " << read_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
     std::cout << "Write: " << write_bytes / (1024.0 * 1024.0) << " MB" << std::endl;
@@ -224,15 +228,19 @@ int main() {
 
 | Method | Description |
 |--------|-------------|
-| `Initialize()` | Auto-detect and initialize the appropriate backend (Mali → Adreno → CPU → NPU) |
+| `Initialize()` | Auto-detect and initialize backends (one GPU: Mali or Adreno, then CPU, then NPU); traffic is summed |
 | `Initialize(BackendCategory)` | Initialize with a specific backend category (`GPU`, `CPU`, `NPU`) |
+| `Initialize(vector<BackendCategory>)` | Initialize several categories at once (duplicates ignored); returns true if any succeeded |
 | `Start()` | Start memory traffic profiling (background sampling thread) |
 | `Stop()` | Stop profiling |
-| `GetReadMemoryTraffic()` | Get total bytes read from DRAM |
-| `GetWriteMemoryTraffic()` | Get total bytes written to DRAM |
-| `GetTotalMemoryTraffic()` | Get total bytes (read + write) |
+| `GetReadMemoryTraffic(BackendCategory)` | Bytes read for that category (summed if multiple backends share it) |
+| `GetWriteMemoryTraffic(BackendCategory)` | Bytes written for that category |
+| `GetTotalMemoryTraffic(BackendCategory)` | Read + write for that category |
+| `HasBackendCategory(BackendCategory)` | Whether that category was initialized |
+| `GetBackendCategory(index)` | Category for backend at `index` (precondition: `index` in range) |
 | `IsProfiling()` | Check if profiling is currently active |
-| `GetBackendName()` | Get the name of the active backend |
+| `GetBackendCount()` | Number of initialized backends |
+| `GetBackendName(index)` | Name of backend at `index` (default 0); `nullptr` if invalid |
 
 ### Backend Details
 
